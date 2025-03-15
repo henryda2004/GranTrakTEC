@@ -1,17 +1,28 @@
 BITS 16
-ORG 0x7C00   ; Este es el punto de inicio del código en memoria
+ORG 0x7C00   ; Código de arranque
 
+; ======= CAMBIAR A MODO GRÁFICO 13h =======
 mov ax, 0x13
-int 0x10    ; Cambia a modo gráfico 320x200
+int 0x10 
 
-jmp $       ; Un loop infinito que hace lo mismo, pero usa menos bytes
+; ======= DIBUJAR UN CUADRADO AZUL (CARRO) =======
+mov cx, 50  ; X inicial del cuadrado
+ciclo_x:
+    mov dx, 50  ; Y inicial del cuadrado
+ciclo_y:
+    mov ah, 0x0C
+    mov al, 1  ; Color azul
+    int 0x10  
+    inc dx
+    cmp dx, 60  ; Altura del cuadrado (10 px)
+    jl ciclo_y
+inc cx
+cmp cx, 60  ; Ancho del cuadrado (10 px)
+jl ciclo_x
 
-; ========================
-; Rellenar hasta 510 bytes (Si el código es muy corto, NASM lo llenará con ceros)
-; ========================
-times 510 - ($ - $$) db 0  
+; ======= BUCLE INFINITO PARA MANTENER LA PANTALLA =======
+jmp $
 
-; ========================
-; Firma de arranque (OBLIGATORIA PARA QEMU)
-; ========================
-dw 0xAA55  
+; ======= RELLENAR HASTA 510 BYTES Y FIRMA DE ARRANQUE =======
+times 510-($-$$) db 0
+dw 0xAA55
