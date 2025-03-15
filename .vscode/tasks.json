@@ -1,0 +1,15 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Ejecutar Ensamblador y QEMU",
+            "type": "shell",
+            "command": "nasm -f bin grantrak.asm -o grantrak.bin && qemu-system-i386 -fda grantrak.bin -boot a",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        }
+    ]
+}
