@@ -57,9 +57,9 @@ main_loop:
     ; 3b) Comprobar colisión del jugador 1 (verde) con la pista blanca
     call check_collision_player1
 
-    ; (Si hubiera que hacer lo mismo con jugador 2, se podría llamar
-    ;  a otra rutina, p. ej.: "call check_collision_player2")
-
+    ; 3c) Comprobar colisión del jugador 2 (rojo) con la pista blanca
+    call check_collision_player2
+    
     ; 4) Borrar los rectángulos anteriores
     ; -- Jugador 1 --
     mov al, 0
@@ -441,6 +441,67 @@ collision_detected:
     mov word [player_y], 20
 
 no_collision:
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+
+
+; ===============================
+; SUBRUTINA: COMPROBAR COLISIÓN
+; (Sólo Jugador 2 - rojo)
+; ===============================
+check_collision_player2:
+    push ax
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+
+    ; Variables de apoyo en memoria
+    xor ax, ax
+    mov [x_off], ax       ; x_off = 0
+outer_x_loop_2:
+    xor ax, ax
+    mov [y_off], ax       ; y_off = 0
+
+outer_y_loop_2:
+    ; Leer color del píxel en (player2_x + x_off, player2_y + y_off)
+    mov ah, 0x0D          ; Función Read Pixel
+    xor bh, bh            ; Página 0
+    mov cx, [player2_x]
+    add cx, [x_off]
+    mov dx, [player2_y]
+    add dx, [y_off]
+    int 0x10              ; AL = color del pixel
+
+    cmp al, 15            ; ¿Es blanco?
+    je collision_detected_2  ; Sí -> colisión
+
+    ; Incrementar y_off
+    inc word [y_off]
+    mov ax, [y_off]
+    cmp ax, [player2_height]
+    jl outer_y_loop_2       ; mientras y_off < player2_height
+
+    ; Pasar a siguiente x_off
+    inc word [x_off]
+    mov ax, [x_off]
+    cmp ax, [player2_width]
+    jl outer_x_loop_2       ; mientras x_off < player2_width
+
+    jmp no_collision_2
+
+collision_detected_2:
+    ; Restaurar posición inicial del Jugador 2 (rojo)
+    mov word [player2_x], 100
+    mov word [player2_y], 40
+
+no_collision_2:
     pop di
     pop si
     pop dx
