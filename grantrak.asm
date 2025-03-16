@@ -9,16 +9,16 @@ jmp inicio  ; Saltamos sobre la zona de variables para empezar código
 ; Jugador 1
 player_x        dw 50     ; Posición X inicial
 player_y        dw 50     ; Posición Y inicial
-player_color    db 2      ; Color verde (modo 13h)
+player_color    db 2      ; Color verde (modo 0x12, 16c)
 player_width    dw 10     ; Ancho
 player_height   dw 10     ; Alto
-old_x           dw 50     ; Posición inicial para evitar borrar nada al inicio
+old_x           dw 50
 old_y           dw 50
 
 ; Jugador 2
 player2_x       dw 100    ; Posición X inicial para el segundo jugador
 player2_y       dw 100    ; Posición Y inicial para el segundo jugador
-player2_color   db 4      ; Color rojo (modo 13h)
+player2_color   db 4      ; Color rojo (modo 0x12, 16c)
 player2_width   dw 10     ; Ancho
 player2_height  dw 10     ; Alto
 old2_x          dw 100
@@ -28,15 +28,16 @@ old2_y          dw 100
 ; CÓDIGO PRINCIPAL
 ; ==================================
 inicio:
-    ; Ajustar DS para que apunte al segmento correcto
+    ; Ajustar DS para que apunte al segmento 0 (somos un boot sector)
     xor ax, ax
     mov ds, ax
 
-    ; Cambiar a modo gráfico 13h (320x200, 256 colores)
-    mov ax, 0x13
+    ; Cambiar a modo gráfico 0x12 (640x480, 16 colores)
+    mov ax, 0x12
     int 0x10
 
-    ; Dibujar ambos jugadores inmediatamente
+    ; -- Dibujar ambos jugadores inmediatamente --
+
     ; Jugador 1
     mov al, [player_color]
     mov cx, [player_x]
@@ -54,7 +55,7 @@ inicio:
     call draw_rectangle
 
 main_loop:
-    ; 1) Guardar la posición actual como "posición anterior" (de ambos jugadores)
+    ; 1) Guardar las posiciones actuales como "anteriores"
     mov ax, [player_x]
     mov [old_x], ax
     mov ax, [player_y]
@@ -65,13 +66,13 @@ main_loop:
     mov ax, [player2_y]
     mov [old2_y], ax
 
-    ; 2) Leer tecla (esperar a que se pulse)
-    call read_key  ; AH contiene scancode, AL el ASCII
+    ; 2) Leer tecla (bloquea hasta que se pulse)
+    call read_key  ; AH = scancode, AL = ASCII
 
-    ; 3) Actualizar la posición según flechas (jugador 1) o WASD (jugador 2)
+    ; 3) Actualizar posición según flechas (jugador 1) o WASD (jugador 2)
     call update_position
 
-    ; 4) Borrar el rectángulo en la POSICIÓN ANTERIOR (color 0) de ambos jugadores
+    ; 4) Borrar el rectángulo en la POSICIÓN ANTERIOR (color 0 = negro)
     ; Jugador 1
     mov al, 0
     mov cx, [old_x]
@@ -88,7 +89,7 @@ main_loop:
     mov di, [player2_height]
     call draw_rectangle
 
-    ; 5) Dibujar el rectángulo en la POSICIÓN NUEVA (sus respectivos colores)
+    ; 5) Dibujar el rectángulo en la POSICIÓN NUEVA (sus colores respectivos)
     ; Jugador 1
     mov al, [player_color]
     mov cx, [player_x]
@@ -117,11 +118,11 @@ read_key:
 
 ; ===============================
 ; SUBRUTINA: ACTUALIZAR POSICIÓN
-;      - AH = scancode de la tecla
-;      - Maneja flechas (jugador 1) y WASD (jugador 2)
+;      - AH = scancode
+;      - Mueve Jugador 1 con flechas, Jugador 2 con WASD
 ; ===============================
 update_position:
-    ; --- Flechas para Jugador 1 ---
+    ; --- Flechas Jugador 1 ---
     cmp ah, 0x48  ; Flecha ↑
     je move_up_1
     cmp ah, 0x50  ; Flecha ↓
@@ -131,7 +132,7 @@ update_position:
     cmp ah, 0x4D  ; Flecha →
     je move_right_1
 
-    ; --- WASD para Jugador 2 (scancodes) ---
+    ; --- WASD Jugador 2 (scancodes) ---
     cmp ah, 0x11  ; W
     je move_up_2
     cmp ah, 0x1F  ; S
@@ -141,29 +142,29 @@ update_position:
     cmp ah, 0x20  ; D
     je move_right_2
 
-    ret  ; Si no es flecha ni WASD, no hacemos nada
+    ret  ; Si no coincide, no hace nada
 
-; === Movimientos Jugador 1 ===
+; === Movimientos Jugador 1 (con nuevos límites: 0..639 en X, 0..479 en Y) ===
 move_up_1:
-    cmp word [player_y], 1   ; Límite superior
+    cmp word [player_y], 1
     jle done
     sub word [player_y], 5
     jmp done
 
 move_down_1:
-    cmp word [player_y], 190 ; Límite inferior (200 - 10)
+    cmp word [player_y], 470  ; 480 - 10 = 470
     jge done
     add word [player_y], 5
     jmp done
 
 move_left_1:
-    cmp word [player_x], 1   ; Límite izquierdo
+    cmp word [player_x], 1
     jle done
     sub word [player_x], 5
     jmp done
 
 move_right_1:
-    cmp word [player_x], 310 ; Límite derecho (320 - 10)
+    cmp word [player_x], 630  ; 640 - 10 = 630
     jge done
     add word [player_x], 5
     jmp done
@@ -176,7 +177,7 @@ move_up_2:
     jmp done
 
 move_down_2:
-    cmp word [player2_y], 190
+    cmp word [player2_y], 470
     jge done
     add word [player2_y], 5
     jmp done
@@ -188,7 +189,7 @@ move_left_2:
     jmp done
 
 move_right_2:
-    cmp word [player2_x], 310
+    cmp word [player2_x], 630
     jge done
     add word [player2_x], 5
     jmp done
@@ -198,38 +199,44 @@ done:
 
 ; ===============================
 ; SUBRUTINA: DIBUJAR RECTÁNGULO
-;      - CX = X inicial
-;      - DX = Y inicial
-;      - SI = Ancho
-;      - DI = Alto
-;      - AL = Color
+;  - CX = X inicial
+;  - DX = Y inicial
+;  - SI = Ancho
+;  - DI = Alto
+;  - AL = Color (0..15)
 ; ===============================
 draw_rectangle:
-    push cx       ; Guardamos X inicial
-    push dx       ; Guardamos Y inicial
-    push si       ; Guardamos el ancho
-    mov  bx, di   ; Usamos BX para contar las filas (alto)
+    push cx       ; Guardar X inicial
+    push dx       ; Guardar Y inicial
+    push si       ; Guardar el ancho
+    mov  bx, di   ; BX = altura (contador de filas)
 
-fila:
-    mov si, [esp]      ; Recuperamos ancho
-    mov cx, [esp + 4]  ; Recuperamos X inicial
+.filas:
+    mov si, [esp]      ; Recupera ancho
+    mov cx, [esp + 4]  ; Recupera X inicial
 
-columna:
-    mov ah, 0x0C       ; Función BIOS para plot pixel en modo 13h
-    int 0x10  
+.columnas:
+    ; Uso de INT 0x10, función 0x0C para modo 0x12 (16 colores)
+    ; BH = 0 (página), AL = color, CX = x, DX = y
+    mov ah, 0x0C
+    xor bh, bh       ; Página 0
+    int 0x10
+
     inc cx
     dec si
-    jnz columna
+    jnz .columnas
 
     inc dx
     dec bx
-    jnz fila
+    jnz .filas
 
     pop si
     pop dx
     pop cx
     ret
 
-; Rellenar hasta 512 bytes
+; ===============================
+; BOOT SECTOR (rellena hasta 512 bytes)
+; ===============================
 times 510 - ($ - $$) db 0
 dw 0xAA55
