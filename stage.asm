@@ -207,170 +207,249 @@ draw_rectangle:
 ; SUBRUTINA: DIBUJAR LA PISTA
 ; ===============================
 draw_track:
-    ; Varios rectángulos en blanco (15)
+    ;al: Color del rectángulo (siempre 15, que es blanco en la paleta estándar VGA)
+    ;cx: Coordenada X de la esquina superior izquierda
+    ;dx: Coordenada Y de la esquina superior izquierda
+    ;si: Ancho del rectángulo en píxeles
+    ;di: Alto del rectángulo en píxeles
+
+    ; Recta inferior
+    ; Tramo 1.1
     mov al, 15
-    mov cx, 50
-    mov dx, 10
+    mov cx, 100
+    mov dx, 400
     mov si, 200
     mov di, 5
     call draw_rectangle
 
+    ; Tramo 1.2
+    mov al, 15
+    mov cx, 120
+    mov dx, 350
+    mov si, 190
+    mov di, 5
+    call draw_rectangle
+
+    ; Curva inferior
+    ; Tramo 1.3
+    mov al, 15
+    mov cx, 10
+    mov dx, 300
+    mov si, 5
+    mov di, 5
+    call draw_rectangle
+
+    mov al, 15
+    mov cx, 15
+    mov dx, 305
+    mov si, 5
+    mov di, 5
+    call draw_rectangle
+
+    mov al, 15
+    mov cx, 20
+    mov dx, 310
+    mov si, 5
+    mov di, 5
+    call draw_rectangle
+
+    mov al, 15
+    mov cx, 25
+    mov dx, 315
+    mov si, 5
+    mov di, 5
+    call draw_rectangle
+
+    mov al, 15
+    mov cx, 30
+    mov dx, 320
+    mov si, 5
+    mov di, 5
+    call draw_rectangle
+
+    mov al, 15
+    mov cx, 35
+    mov dx, 325
+    mov si, 5
+    mov di, 5
+    call draw_rectangle
+
+    mov al, 15
+    mov cx, 40
+    mov dx, 330
+    mov si, 5
+    mov di, 5
+    call draw_rectangle
+
+    mov al, 15
+    mov cx, 45
+    mov dx, 335
+    mov si, 5
+    mov di, 5
+    call draw_rectangle
+
     mov al, 15
     mov cx, 50
-    mov dx, 80
-    mov si, 180
+    mov dx, 340
+    mov si, 5
     mov di, 5
     call draw_rectangle
 
     mov al, 15
-    mov cx, 290
-    mov dx, 10
-    mov si, 200
+    mov cx, 55
+    mov dx, 345
+    mov si, 5
     mov di, 5
     call draw_rectangle
 
     mov al, 15
-    mov cx, 250
-    mov dx, 10
+    mov cx, 60
+    mov dx, 350
     mov si, 5
-    mov di, 10
+    mov di, 5
+    call draw_rectangle
+    
+    mov al, 15
+    mov cx, 65
+    mov dx, 355
+    mov si, 5
+    mov di, 5
     call draw_rectangle
 
     mov al, 15
-    mov cx, 245
-    mov dx, 110
+    mov cx, 70
+    mov dx, 360
     mov si, 5
-    mov di, 10
+    mov di, 5
     call draw_rectangle
 
     mov al, 15
-    mov cx, 240
-    mov dx, 100
+    mov cx, 75
+    mov dx, 365
     mov si, 5
-    mov di, 10
+    mov di, 5
     call draw_rectangle
 
     mov al, 15
-    mov cx, 235
-    mov dx, 90
+    mov cx, 80
+    mov dx, 370
     mov si, 5
-    mov di, 10
+    mov di, 5
     call draw_rectangle
 
     mov al, 15
-    mov cx, 230
-    mov dx, 80
+    mov cx, 85
+    mov dx, 375
     mov si, 5
-    mov di, 10
+    mov di, 5
     call draw_rectangle
 
     mov al, 15
-    mov cx, 255
-    mov dx, 20
+    mov cx, 90
+    mov dx, 380
     mov si, 5
-    mov di, 10
+    mov di, 5
     call draw_rectangle
 
     mov al, 15
-    mov cx, 260
-    mov dx, 30
+    mov cx, 95
+    mov dx, 385
     mov si, 5
-    mov di, 20
+    mov di, 5
     call draw_rectangle
 
     mov al, 15
-    mov cx, 265
-    mov dx, 50
+    mov cx, 100
+    mov dx, 390
     mov si, 5
-    mov di, 20
+    mov di, 5
     call draw_rectangle
 
     mov al, 15
-    mov cx, 270
-    mov dx, 70
+    mov cx, 105
+    mov dx, 395
     mov si, 5
-    mov di, 10
+    mov di, 5
+    call draw_rectangle
+
+    ; Curva inferior
+    ; Tramo 1.4
+    mov al, 15
+    mov cx, 70
+    mov dx, 300
+    mov si, 5
+    mov di, 5
     call draw_rectangle
 
     mov al, 15
-    mov cx, 275
-    mov dx, 50
+    mov cx, 75
+    mov dx, 305
     mov si, 5
-    mov di, 20
+    mov di, 5
     call draw_rectangle
 
     mov al, 15
-    mov cx, 280
-    mov dx, 20
+    mov cx, 80
+    mov dx, 310
     mov si, 5
-    mov di, 30
+    mov di, 5
+    call draw_rectangle
+    
+    mov al, 15
+    mov cx, 85
+    mov dx, 315
+    mov si, 5
+    mov di, 5
     call draw_rectangle
 
     mov al, 15
-    mov cx, 285
-    mov dx, 10
+    mov cx, 90
+    mov dx, 320
     mov si, 5
-    mov di, 10
-    call draw_rectangle
-
-
-    mov al, 15
-    mov cx, 250
-    mov dx, 120
-    mov si, 5
-    mov di, 10
+    mov di, 5
     call draw_rectangle
 
     mov al, 15
-    mov cx, 255
-    mov dx, 130
+    mov cx, 95
+    mov dx, 325
     mov si, 5
-    mov di, 10
+    mov di, 5
     call draw_rectangle
 
     mov al, 15
-    mov cx, 260
-    mov dx, 140
+    mov cx, 100
+    mov dx, 330
     mov si, 5
-    mov di, 20
+    mov di, 5
     call draw_rectangle
 
     mov al, 15
-    mov cx, 265
-    mov dx, 160
+    mov cx, 105
+    mov dx, 335
     mov si, 5
-    mov di, 20
+    mov di, 5
     call draw_rectangle
 
     mov al, 15
-    mov cx, 270
-    mov dx, 180
+    mov cx, 110
+    mov dx, 340
     mov si, 5
-    mov di, 10
+    mov di, 5
     call draw_rectangle
 
     mov al, 15
-    mov cx, 275
-    mov dx, 160
+    mov cx, 115
+    mov dx, 345
     mov si, 5
-    mov di, 20
+    mov di, 5
     call draw_rectangle
 
-    mov al, 15
-    mov cx, 280
-    mov dx, 130
-    mov si, 5
-    mov di, 30
-    call draw_rectangle
 
-    mov al, 15
-    mov cx, 285
-    mov dx, 120
-    mov si, 5
-    mov di, 10
-    call draw_rectangle
+    
 
     ret
+
+
 
 ; ===============================
 ; SECCIÓN DE DATOS
