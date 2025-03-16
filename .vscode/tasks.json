@@ -2,9 +2,9 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Ejecutar Ensamblador y QEMU",
+            "label": "Compilar y Ejecutar en QEMU",
             "type": "shell",
-            "command": "nasm -f bin grantrak.asm -o grantrak.bin && qemu-system-i386 -fda grantrak.bin -boot a",
+            "command": "nasm -f bin boot1.asm -o boot1.bin && nasm -f bin stage.asm -o stage.bin && cat boot1.bin stage.bin > disk.img && qemu-system-i386 -fda disk.img -boot a",
             "group": {
                 "kind": "build",
                 "isDefault": true
