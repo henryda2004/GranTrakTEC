@@ -444,7 +444,34 @@ draw_track:
     mov di, 5
     call draw_rectangle
 
+    ; Recta 
+    ; Tramo 1.5
+    mov al, 15
+    mov cx, 120
+    mov dx, 70
+    mov si, 5
+    mov di, 150
+    call draw_rectangle
+    
+    ; Tramo 1.6
+    mov al, 15
+    mov cx, 60
+    mov dx, 10
+    mov si, 5
+    mov di, 210
+    call draw_rectangle
 
+
+
+
+
+
+
+
+
+    
+
+    
     
 
     ret
