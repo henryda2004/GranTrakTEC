@@ -16,10 +16,10 @@ inicio:
     mov ax, 0x12
     int 0x10
 
-    ; Dibujar la pista
+    ; Dibujar la pista (blanca)
     call draw_track
 
-    ; ---- Jugador 1 ----
+    ; ---- Jugador 1 (VERDE) ----
     mov al, [player_color]  ; Color
     mov cx, [player_x]      ; X
     mov dx, [player_y]      ; Y
@@ -27,7 +27,7 @@ inicio:
     mov di, [player_height] ; Alto
     call draw_rectangle
 
-    ; ---- Jugador 2 ----
+    ; ---- Jugador 2 (ROJO) ----
     mov al, [player2_color]  
     mov cx, [player2_x]      
     mov dx, [player2_y]      
@@ -37,7 +37,7 @@ inicio:
 
 
 main_loop:
-    ; 1) Guardar las posiciones actuales
+    ; 1) Guardar las posiciones actuales (para borrarlas luego)
     mov ax, [player_x]
     mov [old_x], ax
     mov ax, [player_y]
@@ -51,10 +51,17 @@ main_loop:
     ; 2) Leer tecla
     call read_key  ; AH=scancode, AL=ASCII
 
-    ; 3) Actualizar posiciones
+    ; 3) Actualizar posiciones de los jugadores
     call update_position
 
-    ; 4) Borrar rectángulos anteriores (color 0)
+    ; 3b) Comprobar colisión del jugador 1 (verde) con la pista blanca
+    call check_collision_player1
+
+    ; (Si hubiera que hacer lo mismo con jugador 2, se podría llamar
+    ;  a otra rutina, p. ej.: "call check_collision_player2")
+
+    ; 4) Borrar los rectángulos anteriores
+    ; -- Jugador 1 --
     mov al, 0
     mov cx, [old_x]
     mov dx, [old_y]
@@ -62,6 +69,7 @@ main_loop:
     mov di, [player_height]
     call draw_rectangle
 
+    ; -- Jugador 2 --
     mov al, 0
     mov cx, [old2_x]
     mov dx, [old2_y]
@@ -69,7 +77,8 @@ main_loop:
     mov di, [player2_height]
     call draw_rectangle
 
-    ; 5) Dibujar nuevos
+    ; 5) Dibujar los rectángulos en la nueva posición
+    ; -- Jugador 1 --
     mov al, [player_color]
     mov cx, [player_x]
     mov dx, [player_y]
@@ -77,6 +86,7 @@ main_loop:
     mov di, [player_height]
     call draw_rectangle
 
+    ; -- Jugador 2 --
     mov al, [player2_color]
     mov cx, [player2_x]
     mov dx, [player2_y]
@@ -99,6 +109,7 @@ read_key:
 ; SUBRUTINA: ACTUALIZAR POSICIÓN
 ; ===============================
 update_position:
+    ; Jugador 1: flechas
     cmp ah, 0x48  ; Flecha ↑
     je move_up_1
     cmp ah, 0x50  ; Flecha ↓
@@ -108,6 +119,7 @@ update_position:
     cmp ah, 0x4D  ; Flecha →
     je move_right_1
 
+    ; Jugador 2: W, S, A, D
     cmp ah, 0x11  ; W
     je move_up_2
     cmp ah, 0x1F  ; S
@@ -119,7 +131,7 @@ update_position:
 
     ret
 
-; === Jugador 1 (0..639 x, 0..479 y) ===
+; === Jugador 1 (verde) (0..639 x, 0..479 y) ===
 move_up_1:
     cmp word [player_y], 1
     jle done
@@ -144,7 +156,7 @@ move_right_1:
     add word [player_x], 5
     jmp done
 
-; === Jugador 2 ===
+; === Jugador 2 (rojo) ===
 move_up_2:
     cmp word [player2_y], 1
     jle done
@@ -176,18 +188,19 @@ done:
 ; SUBRUTINA: DIBUJAR RECTÁNGULO
 ; ===============================
 draw_rectangle:
+    ; Entra: AL=color, CX=x, DX=y, SI=ancho, DI=alto
     push cx
     push dx
     push si
-    mov bx, di  ; alto
+    mov bx, di  ; guardamos alto en bx
 
 .filas:
-    mov si, [esp]     ; ancho
-    mov cx, [esp+4]   ; X inicial
+    mov si, [esp]    ; ancho en SI (cada vuelta se reinicia)
+    mov cx, [esp+4]  ; X inicial
 
 .columnas:
     mov ah, 0x0C
-    xor bh, bh        ; página 0
+    xor bh, bh       ; página 0
     int 0x10
 
     inc cx
@@ -207,7 +220,7 @@ draw_rectangle:
 ; SUBRUTINA: DIBUJAR LA PISTA
 ; ===============================
 draw_track:
-    ; Varios rectángulos en blanco (15)
+    ; Varios rectángulos en blanco (color 15)
     mov al, 15
     mov cx, 50
     mov dx, 10
@@ -313,7 +326,6 @@ draw_track:
     mov di, 10
     call draw_rectangle
 
-
     mov al, 15
     mov cx, 250
     mov dx, 120
@@ -373,23 +385,93 @@ draw_track:
     ret
 
 ; ===============================
+; SUBRUTINA: COMPROBAR COLISIÓN 
+; (Sólo Jugador 1 - verde)
+; ===============================
+; Si en el área del jugador hay al menos un píxel
+; de color 15 (blanco), se asume colisión y se
+; regresa al punto de partida (x=100, y=20).
+; ===============================
+check_collision_player1:
+    push ax
+    push bx
+    push cx
+    push dx
+    push si
+    push di
+
+    ; Variables de apoyo en memoria
+    xor ax, ax
+    mov [x_off], ax       ; x_off = 0
+outer_x_loop:
+    xor ax, ax
+    mov [y_off], ax       ; y_off = 0
+
+outer_y_loop:
+    ; Leer color del píxel en (player_x + x_off, player_y + y_off)
+    mov ah, 0x0D          ; Función Read Pixel
+    xor bh, bh            ; Página 0
+    mov cx, [player_x]
+    add cx, [x_off]
+    mov dx, [player_y]
+    add dx, [y_off]
+    int 0x10              ; AL = color del pixel
+
+    cmp al, 15            ; ¿Es blanco?
+    je collision_detected  ; Sí -> colisión
+
+    ; Incrementar y_off
+    inc word [y_off]
+    mov ax, [y_off]
+    cmp ax, [player_height]
+
+    jl outer_y_loop       ; mientras y_off < player_height
+
+    ; Pasar a siguiente x_off
+    inc word [x_off]
+    mov ax, [x_off]
+    cmp ax, [player_width]
+    jl outer_x_loop       ; mientras x_off < player_width
+
+    jmp no_collision
+
+collision_detected:
+    ; Restaurar posición (punto de partida)
+    mov word [player_x], 100
+    mov word [player_y], 20
+
+no_collision:
+    pop di
+    pop si
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+
+
+; ===============================
 ; SECCIÓN DE DATOS
 ; ===============================
 player_x        dw 100
 player_y        dw 20
-player_color    db 2
+player_color    db 2      ; Verde
 player_width    dw 10
 player_height   dw 10
 old_x           dw 100
-old_y           dw 50
+old_y           dw 20
 
 player2_x       dw 100
 player2_y       dw 40
-player2_color   db 4
+player2_color   db 4      ; Rojo
 player2_width   dw 10
 player2_height  dw 10
 old2_x          dw 100
-old2_y          dw 50
+old2_y          dw 40
 
-; NO SE PONE TIMES 510... NI dw 0xAA55
-; Porque NO es un boot sector
+; Para la rutina de colisión
+x_off           dw 0
+y_off           dw 0
+
+; Observa que aquí ya no utilizamos "TIMES 510 - ($-$$) db 0" ni "dw 0xAA55"
+; porque esto NO es un boot sector.
