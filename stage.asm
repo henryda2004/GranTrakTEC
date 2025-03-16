@@ -216,6 +216,13 @@ draw_track:
     call draw_rectangle
 
     mov al, 15
+    mov cx, 50
+    mov dx, 80
+    mov si, 180
+    mov di, 5
+    call draw_rectangle
+
+    mov al, 15
     mov cx, 290
     mov dx, 10
     mov si, 200
@@ -225,6 +232,34 @@ draw_track:
     mov al, 15
     mov cx, 250
     mov dx, 10
+    mov si, 5
+    mov di, 10
+    call draw_rectangle
+
+    mov al, 15
+    mov cx, 245
+    mov dx, 110
+    mov si, 5
+    mov di, 10
+    call draw_rectangle
+
+    mov al, 15
+    mov cx, 240
+    mov dx, 100
+    mov si, 5
+    mov di, 10
+    call draw_rectangle
+
+    mov al, 15
+    mov cx, 235
+    mov dx, 90
+    mov si, 5
+    mov di, 10
+    call draw_rectangle
+
+    mov al, 15
+    mov cx, 230
+    mov dx, 80
     mov si, 5
     mov di, 10
     call draw_rectangle
@@ -240,19 +275,97 @@ draw_track:
     mov cx, 260
     mov dx, 30
     mov si, 5
-    mov di, 10
+    mov di, 20
     call draw_rectangle
 
     mov al, 15
     mov cx, 265
-    mov dx, 40
+    mov dx, 50
+    mov si, 5
+    mov di, 20
+    call draw_rectangle
+
+    mov al, 15
+    mov cx, 270
+    mov dx, 70
     mov si, 5
     mov di, 10
     call draw_rectangle
 
     mov al, 15
-    mov cx, 270
+    mov cx, 275
     mov dx, 50
+    mov si, 5
+    mov di, 20
+    call draw_rectangle
+
+    mov al, 15
+    mov cx, 280
+    mov dx, 20
+    mov si, 5
+    mov di, 30
+    call draw_rectangle
+
+    mov al, 15
+    mov cx, 285
+    mov dx, 10
+    mov si, 5
+    mov di, 10
+    call draw_rectangle
+
+
+    mov al, 15
+    mov cx, 250
+    mov dx, 120
+    mov si, 5
+    mov di, 10
+    call draw_rectangle
+
+    mov al, 15
+    mov cx, 255
+    mov dx, 130
+    mov si, 5
+    mov di, 10
+    call draw_rectangle
+
+    mov al, 15
+    mov cx, 260
+    mov dx, 140
+    mov si, 5
+    mov di, 20
+    call draw_rectangle
+
+    mov al, 15
+    mov cx, 265
+    mov dx, 160
+    mov si, 5
+    mov di, 20
+    call draw_rectangle
+
+    mov al, 15
+    mov cx, 270
+    mov dx, 180
+    mov si, 5
+    mov di, 10
+    call draw_rectangle
+
+    mov al, 15
+    mov cx, 275
+    mov dx, 160
+    mov si, 5
+    mov di, 20
+    call draw_rectangle
+
+    mov al, 15
+    mov cx, 280
+    mov dx, 130
+    mov si, 5
+    mov di, 30
+    call draw_rectangle
+
+    mov al, 15
+    mov cx, 285
+    mov dx, 120
     mov si, 5
     mov di, 10
     call draw_rectangle
@@ -263,7 +376,7 @@ draw_track:
 ; SECCIÓN DE DATOS
 ; ===============================
 player_x        dw 100
-player_y        dw 50
+player_y        dw 20
 player_color    db 2
 player_width    dw 10
 player_height   dw 10
@@ -271,7 +384,7 @@ old_x           dw 100
 old_y           dw 50
 
 player2_x       dw 100
-player2_y       dw 70
+player2_y       dw 40
 player2_color   db 4
 player2_width   dw 10
 player2_height  dw 10
