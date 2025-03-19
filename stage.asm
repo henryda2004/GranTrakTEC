@@ -45,7 +45,7 @@ inicio:
 
 
 main_loop:
-    ; 1) Guardar las posiciones actuales (para borrarlas luego)
+    ; 1) Guardar las posiciones actuales
     mov ax, [player_x]
     mov [old_x], ax
     mov ax, [player_y]
@@ -56,8 +56,8 @@ main_loop:
     mov ax, [player2_y]
     mov [old2_y], ax
 
-    ; 2) Leer tecla
-    call read_key  ; AH=scancode, AL=ASCII
+    ; 2) Leer tecla (ahora no bloquea)
+    call read_key  
 
     ; 3) Actualizar posiciones de los jugadores
     call update_position
@@ -109,7 +109,7 @@ main_loop:
     mov ax, [bot_y]
     mov [old_bot_y], ax
 
-    ; 2) Mover bot
+    ; 2) Mover bot (ahora siempre se mueve)
     call move_bot
 
     ; 3) Borrar bot anterior
@@ -128,17 +128,22 @@ main_loop:
     mov di, [bot_height]
     call draw_rectangle
 
-
-
     jmp main_loop
 
 
+
 ; ===============================
-; SUBRUTINA: LEER TECLA
+; SUBRUTINA: LEER TECLA (NO BLOQUEANTE)
 ; ===============================
 read_key:
-    mov ah, 0x00
+    mov ah, 0x01  ; Verificar si hay una tecla lista
     int 0x16
+    jz no_key_pressed  ; Si no hay tecla, saltar
+
+    mov ah, 0x00  ; Leer la tecla (bloqueante, pero ya sabemos que hay una)
+    int 0x16
+
+no_key_pressed:
     ret
 
 ; ===============================
