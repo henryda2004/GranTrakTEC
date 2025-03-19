@@ -35,6 +35,14 @@ inicio:
     mov di, [player2_height] 
     call draw_rectangle
 
+    ; BOT (dibujarlo aquí para que aparezca de inmediato)
+    mov al, [bot_color]
+    mov cx, [bot_x]
+    mov dx, [bot_y]
+    mov si, [bot_width]
+    mov di, [bot_height]
+    call draw_rectangle
+
 
 main_loop:
     ; 1) Guardar las posiciones actuales (para borrarlas luego)
@@ -93,6 +101,34 @@ main_loop:
     mov si, [player2_width]
     mov di, [player2_height]
     call draw_rectangle
+
+    ; === BOT ===
+    ; 1) Guardar pos anterior
+    mov ax, [bot_x]
+    mov [old_bot_x], ax
+    mov ax, [bot_y]
+    mov [old_bot_y], ax
+
+    ; 2) Mover bot
+    call move_bot
+
+    ; 3) Borrar bot anterior
+    mov al, 0
+    mov cx, [old_bot_x]
+    mov dx, [old_bot_y]
+    mov si, [bot_width]
+    mov di, [bot_height]
+    call draw_rectangle
+
+    ; 4) Dibujar bot en nueva posición
+    mov al, [bot_color]
+    mov cx, [bot_x]
+    mov dx, [bot_y]
+    mov si, [bot_width]
+    mov di, [bot_height]
+    call draw_rectangle
+
+
 
     jmp main_loop
 
@@ -183,6 +219,37 @@ move_right_2:
 
 done:
     ret
+
+; ===============================
+; SUBRUTINA: MOVER EL BOT
+; ===============================
+move_bot:
+    cmp byte [bot_direction], 1  ; Derecha
+    je bot_move_right
+    cmp byte [bot_direction], 2  ; Abajo
+    je bot_move_down
+    cmp byte [bot_direction], 3  ; Izquierda
+    je bot_move_left
+    cmp byte [bot_direction], 4  ; Arriba
+    je bot_move_up
+    ret
+
+bot_move_right:
+    add word [bot_x], 5
+    ret
+
+bot_move_down:
+    add word [bot_y], 5
+    ret
+
+bot_move_left:
+    sub word [bot_x], 5
+    ret
+
+bot_move_up:
+    sub word [bot_y], 5
+    ret
+
 
 ; ===============================
 ; SUBRUTINA: DIBUJAR RECTÁNGULO
@@ -498,7 +565,7 @@ no_collision_2:
 ; SECCIÓN DE DATOS
 ; ===============================
 player_x        dw 100
-player_y        dw 20
+player_y        dw 25
 player_color    db 2      ; Verde
 player_width    dw 10
 player_height   dw 10
@@ -512,6 +579,16 @@ player2_width   dw 10
 player2_height  dw 10
 old2_x          dw 100
 old2_y          dw 40
+
+
+bot_x          dw 100    ; Posición inicial en X
+bot_y          dw 55     ; Posición inicial en Y
+bot_color      db 1      ; Azul
+bot_width      dw 10     ; Ancho del bot
+bot_height     dw 10     ; Alto del bot
+old_bot_x      dw 100
+old_bot_y      dw 55
+bot_direction  db 1  ; 1=Derecha, 2=Abajo, 3=Izquierda, 4=Arriba
 
 ; Para la rutina de colisión
 x_off           dw 0
