@@ -45,6 +45,11 @@ inicio:
 
 
 main_loop:
+    call check_timer
+    call display_timer 
+    cmp word [time_left], 0
+    je time_is_up
+
     ; 1) Guardar las posiciones actuales (para borrarlas luego)
     mov ax, [player_x]
     mov [old_x], ax
@@ -132,13 +137,145 @@ main_loop:
 
     jmp main_loop
 
+time_is_up:
+    ; Mensaje de “Fin del juego”
+    ; Determinar ganador, etc.
+    hlt
+    jmp time_is_up
+
+; --------------------------------------
+; start_timer: lee el contador BIOS (CX:DX)
+; y calcula end_time = DX + 1092 (para 60s)
+; --------------------------------------
+start_timer:
+    mov ah, 0
+    int 0x1A               ; CX:DX = ticks desde medianoche (18.2 Hz)
+    mov [start_ticks], cx  ; opcional, si quieres guardarlo
+    mov [start_ticks2], dx
+
+    ; Sumar 1092 a DX para 60s
+    mov ax, dx
+    add ax, 1092           ; 1092 = ~18.2 * 60
+    mov [end_ticks2], ax
+    mov [end_ticks], cx    ; sin cambios a CX
+
+    ; time_left = 60 (inicialmente)
+    mov word [time_left], 60
+    ret
+
+; --------------------------------------
+; check_timer: lee el tiempo actual y
+; comprueba si ya llegamos a end_time.
+;  - Si ya llegó, time_left=0
+;  - Si no, calcula time_left approx
+; --------------------------------------
+check_timer:
+    push ax
+    push bx
+    push cx
+    push dx
+    push ds       ; <--- PRESERVAR DS
+    push es       ; <--- PRESERVAR ES
+
+    mov ah, 0
+    int 0x1A      ; Puede alterar DS/ES
+
+    pop es        ; <--- RESTAURAR ES
+    pop ds        ; <--- RESTAURAR DS
+
+    ; Aquí DS vuelve a ser 0x1000
+    ; (el que configuraste al inicio)
+    ; ... y luego continúas con la lógica ...
+    
+    ; Comparar DX con end_ticks2, etc.
+    cmp dx, [end_ticks2]
+    jb  not_reached
+    mov word [time_left], 0
+    jmp short done_check
+
+not_reached:
+    mov ax, [end_ticks2]
+    sub ax, dx
+    mov bl, 18
+    div bl
+    mov [time_left], ax
+
+done_check:
+    pop dx
+    pop cx
+    pop bx
+    pop ax
+    ret
+
 
 ; ===============================
 ; SUBRUTINA: LEER TECLA
 ; ===============================
 read_key:
+    ; Save registers that might be modified
+    push ds
+    push es
+    
+    ; Read key
     mov ah, 0x00
     int 0x16
+    ; Key is now in AX (AH=scancode, AL=ASCII)
+    
+    ; Restore registers
+    pop es
+    pop ds
+    ret  ; Return with key in AX
+
+; ===============================
+; SUBRUTINA: MOSTRAR TIEMPO RESTANTE
+; ===============================
+display_timer:
+    ; Save registers
+    push ax
+    push bx
+    push cx
+    push dx
+    
+    ; Position cursor at top right
+    mov ah, 0x02    ; Set cursor position
+    mov bh, 0       ; Page 0
+    mov dh, 0       ; Row 0
+    mov dl, 70      ; Column 70
+    int 0x10
+    
+    ; Display time
+    mov ax, [time_left]
+    mov bx, 10
+    mov cx, 0       ; Digit counter
+    
+    ; Convert to ASCII
+.convert_loop:
+    xor dx, dx      ; Clear high part of dividend
+    div bx          ; AX / 10, quotient in AX, remainder in DX
+    push dx         ; Push remainder (digit)
+    inc cx          ; Increment counter
+    test ax, ax     ; Check if quotient is zero
+    jnz .convert_loop
+    
+    ; Display digits
+.display_loop:
+    pop dx          ; Get digit
+    add dl, '0'     ; Convert to ASCII
+    mov ah, 0x0E    ; Teletype output
+    mov al, dl      ; Character to display
+    int 0x10        ; Call BIOS
+    loop .display_loop
+    
+    ; Display "s" for seconds
+    mov ah, 0x0E
+    mov al, 's'
+    int 0x10
+    
+    ; Restore registers
+    pop dx
+    pop cx
+    pop bx
+    pop ax
     ret
 
 ; ===============================
@@ -596,3 +733,13 @@ y_off           dw 0
 
 ; Observa que aquí ya no utilizamos "TIMES 510 - ($-$$) db 0" ni "dw 0xAA55"
 ; porque esto NO es un boot sector.
+
+; -------------------------
+; Variables para el cronómetro
+; -------------------------
+start_ticks dw 0      ; Guardará CX al iniciar
+start_ticks2 dw 0     ; Guardará DX al iniciar
+end_ticks   dw 0      ; Guardará CX cuando termine
+end_ticks2  dw 0      ; Guardará DX cuando termine
+
+time_left   dw 60     ; Segundos restantes (aprox)
