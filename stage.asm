@@ -3,6 +3,8 @@
 
 ; -----------------------------------------------------
 ; Stage 2 se carga en 0x1000:0 por boot1.
+; Al saltar aquí, CS=??? (pero normalmente 0x1000),
+; DS=0, ES=0 (puedes ajustar según necesites).
 ; -----------------------------------------------------
 
 inicio:
@@ -14,83 +16,44 @@ inicio:
     mov ax, 0x12
     int 0x10
 
-    ; Inicializar temporizador a 60
-    mov word [timer], 60
+    ; Inicializar el temporizador
+    mov word [timer_count], 60   ; 60 segundos
+    
+    ; Configurar la interrupción del temporizador
+    call setup_timer
 
     ; Dibujar la pista (blanca)
     call draw_track
 
     ; ---- Jugador 1 (VERDE) ----
-    mov al, 2           ; Color verde
-    mov cx, 100         ; X
-    mov dx, 25          ; Y
-    mov si, 10          ; Ancho
-    mov di, 10          ; Alto
+    mov al, [player_color]  ; Color
+    mov cx, [player_x]      ; X
+    mov dx, [player_y]      ; Y
+    mov si, [player_width]  ; Ancho
+    mov di, [player_height] ; Alto
     call draw_rectangle
 
     ; ---- Jugador 2 (ROJO) ----
-    mov al, 4           ; Color rojo
-    mov cx, 100         ; X
-    mov dx, 40          ; Y
-    mov si, 10          ; Ancho
-    mov di, 10          ; Alto
+    mov al, [player2_color]  
+    mov cx, [player2_x]      
+    mov dx, [player2_y]      
+    mov si, [player2_width]  
+    mov di, [player2_height] 
     call draw_rectangle
 
-    ; BOT (AZUL) ----
-    mov al, 1           ; Color azul
-    mov cx, 100         ; X
-    mov dx, 55          ; Y
-    mov si, 10          ; Ancho
-    mov di, 10          ; Alto
+    ; BOT (dibujarlo aquí para que aparezca de inmediato)
+    mov al, [bot_color]
+    mov cx, [bot_x]
+    mov dx, [bot_y]
+    mov si, [bot_width]
+    mov di, [bot_height]
     call draw_rectangle
 
-    ; Resto del código original
-    mov byte [player_color], 2
-    mov word [player_x], 100
-    mov word [player_y], 25
-    mov word [player_width], 10
-    mov word [player_height], 10
-    mov word [old_x], 100
-    mov word [old_y], 20
-
-    mov byte [player2_color], 4
-    mov word [player2_x], 100
-    mov word [player2_y], 40
-    mov word [player2_width], 10
-    mov word [player2_height], 10
-    mov word [old2_x], 100
-    mov word [old2_y], 40
-
-    mov byte [bot_color], 1
-    mov word [bot_x], 100
-    mov word [bot_y], 55
-    mov word [bot_width], 10
-    mov word [bot_height], 10
-    mov word [old_bot_x], 100
-    mov word [old_bot_y], 55
-    mov byte [bot_direction], 1
-
-    ; Dibujar temporizador inicial
+    ; Dibujar el temporizador por primera vez
     call draw_timer
+
 
 main_loop:
-    ; Actualizar temporizador
-    inc word [timer_counter]
-    cmp word [timer_counter], 30
-    jl skip_timer
-    
-    ; Reiniciar contador
-    mov word [timer_counter], 0
-    
-    ; Decrementar temporizador
-    cmp word [timer], 0
-    je game_over
-    dec word [timer]
-    
-    ; Actualizar visualización del temporizador
-    call draw_timer
-
-skip_timer:
     ; 1) Guardar las posiciones actuales (para borrarlas luego)
     mov ax, [player_x]
     mov [old_x], ax
@@ -102,18 +65,17 @@ skip_timer:
     mov ax, [player2_y]
     mov [old2_y], ax
 
-    ; 2) Leer tecla (versión no bloqueante)
-    mov ah, 0x01
+    ; 2) Leer tecla
+    mov ah, 0x01        ; Verificar si hay tecla disponible
     int 0x16
-    jz skip_key
+    jz skip_key_read    ; Si no hay tecla, saltar
     
-    mov ah, 0x00
-    int 0x16
-    
+    call read_key       ; AH=scancode, AL=ASCII
+
     ; 3) Actualizar posiciones de los jugadores
     call update_position
 
-skip_key:
+skip_key_read:
     ; 3b) Comprobar colisión del jugador 1 (verde) con la pista blanca
     call check_collision_player1
 
@@ -180,65 +142,206 @@ skip_key:
     mov di, [bot_height]
     call draw_rectangle
 
+    ; 6) Comprobar si se actualizó el timer
+    cmp byte [timer_updated], 1
+    jne skip_timer_update
+    
+    ; Redibujar el temporizador
+    call draw_timer
+    mov byte [timer_updated], 0
+    
+    ; Comprobar si el tiempo llegó a cero
+    cmp word [timer_count], 0
+    je game_over
+
+skip_timer_update:
+    ; Pequeño retardo para no saturar la CPU
+    mov cx, 1
+    mov dx, 0
+    mov ah, 0x86
+    int 0x15
+
     jmp main_loop
 
 ; ===============================
 ; SUBRUTINA: GAME OVER
 ; ===============================
 game_over:
-    ; Pantalla roja
-    mov ax, 0x0600
-    mov bh, 4      ; Rojo
-    mov cx, 0
-    mov dx, 0x184F
-    int 0x10
+    ; Dibujar mensaje de "TIEMPO AGOTADO" en el centro de la pantalla
+    mov al, 14              ; Color amarillo
+    mov cx, 250             ; Posición X
+    mov dx, 240             ; Posición Y
+    mov si, tiempo_agotado  ; En NASM no se usa 'offset'
+    call draw_text
     
-    ; Esperar tecla
-    mov ah, 0
+    ; Esperar a que presione una tecla para reiniciar
+wait_key:
+    mov ah, 0x00
     int 0x16
     
-    ; Reiniciar juego
+    ; Reiniciar el juego
     jmp inicio
+
+; ===============================
+; SUBRUTINA: CONFIGURAR TEMPORIZADOR
+; ===============================
+setup_timer:
+    ; Guardar el vector de interrupción original
+    push es
+    xor ax, ax
+    mov es, ax
+    mov ax, [es:0x1C*4]    ; Guardar offset del vector original
+    mov [old_timer_offset], ax
+    mov ax, [es:0x1C*4+2]  ; Guardar segmento del vector original
+    mov [old_timer_segment], ax
+    
+    ; Configurar nueva rutina del temporizador
+    cli                     ; Deshabilitar interrupciones
+    mov word [es:0x1C*4], timer_handler    ; Nuevo offset
+    mov word [es:0x1C*4+2], cs             ; Nuevo segmento (cs actual)
+    sti                     ; Habilitar interrupciones
+    
+    pop es
+    ret
+
+; ===============================
+; MANEJADOR DE INTERRUPCIÓN DEL TEMPORIZADOR
+; ===============================
+timer_handler:
+    pusha                   ; Guardar todos los registros
+    
+    ; Actualizar el contador cada ~1 segundo (18.2 ticks por segundo)
+    inc word [tick_counter]
+    cmp word [tick_counter], 18
+    jl timer_end
+    
+    ; Reiniciar el contador de ticks
+    mov word [tick_counter], 0
+    
+    ; Decrementar el temporizador si es > 0
+    cmp word [timer_count], 0
+    je timer_end
+    dec word [timer_count]
+    
+    ; Marcar que el temporizador se actualizó
+    mov byte [timer_updated], 1
+    
+timer_end:
+    popa                    ; Restaurar todos los registros
+    iret                    ; Retornar de la interrupción
 
 ; ===============================
 ; SUBRUTINA: DIBUJAR TEMPORIZADOR
 ; ===============================
 draw_timer:
-    ; Borrar área del temporizador
-    mov al, 0               ; Negro
+    ; Borrar el área del temporizador
+    mov al, 0               ; Color negro
     mov cx, 30              ; X
     mov dx, 400             ; Y
-    mov si, 180             ; Ancho
-    mov di, 15              ; Alto
+    mov si, 80              ; Ancho
+    mov di, 20              ; Alto
     call draw_rectangle
     
-    ; Elegir color según tiempo restante
-    mov al, 10              ; Verde por defecto
-    
-    cmp word [timer], 20
-    jg .dibujar
-    
-    mov al, 14              ; Amarillo si < 20s
-    
-    cmp word [timer], 10
-    jg .dibujar
-    
-    mov al, 4               ; Rojo si < 10s
-    
-.dibujar:
-    ; Calcular ancho proporcional al tiempo
+    ; Dibujar texto "Tiempo: "
+    mov al, 15              ; Color blanco
     mov cx, 30              ; X
     mov dx, 400             ; Y
+    mov si, tiempo_texto    ; En NASM no se usa 'offset'
+    call draw_text
     
-    ; Ancho = timer * 3
-    mov ax, [timer]
-    mov bx, 3
-    mul bx
-    mov si, ax
+    ; Convertir el valor del temporizador a ASCII
+    mov ax, [timer_count]
+    call number_to_ascii
     
-    mov di, 15              ; Alto
-    call draw_rectangle
+    ; Dibujar el valor del temporizador
+    mov al, 15              ; Color blanco
+    mov cx, 90              ; X (después del texto "Tiempo: ")
+    mov dx, 400             ; Y
+    mov si, number_buffer   ; En NASM no se usa 'offset'
+    call draw_text
     
+    ret
+
+; ===============================
+; SUBRUTINA: CONVERTIR NÚMERO A ASCII
+; ===============================
+number_to_ascii:
+    ; Entrada: AX = número a convertir
+    ; Salida: number_buffer contiene la cadena ASCII
+
+    mov di, number_buffer + 5  ; Comenzar desde el final del buffer (sin 'offset')
+    mov byte [di], 0           ; Agregar NULL al final
+    dec di
+    
+    ; Manejar caso especial para 0
+    test ax, ax
+    jnz .non_zero
+    mov byte [di], '0'
+    dec di
+    jmp .done
+    
+.non_zero:
+    mov bx, 10                        ; Divisor = 10
+    
+.loop:
+    xor dx, dx                        ; DX:AX / BX
+    div bx                            ; AX = cociente, DX = resto
+    
+    add dl, '0'                       ; Convertir resto a ASCII
+    mov [di], dl                      ; Guardar dígito
+    dec di                            ; Mover a la izquierda
+    
+    test ax, ax                       ; ¿Queda más por convertir?
+    jnz .loop                         ; Sí, continuar
+    
+.done:
+    inc di                            ; Apuntar al primer dígito
+    mov si, di                        ; SI = inicio de la cadena
+    ret
+
+; ===============================
+; SUBRUTINA: DIBUJAR TEXTO
+; ===============================
+draw_text:
+    ; Entrada:
+    ; AL = color
+    ; CX = posición X
+    ; DX = posición Y
+    ; SI = puntero a cadena terminada en NULL
+    
+    push cx
+    push dx
+    push si
+    
+.next_char:
+    lodsb                   ; Cargar el próximo carácter en AL
+    test al, al            ; ¿Es null (fin de la cadena)?
+    jz .done               ; Sí, terminar
+    
+    push si                ; Guardar puntero a la cadena
+    
+    ; Dibujar el carácter usando int 0x10, función 0x0E
+    mov ah, 0x0E           ; Función de teletipo
+    mov bh, 0              ; Página 0
+    int 0x10
+    
+    pop si                 ; Restaurar puntero a la cadena
+    
+    add cx, 8              ; Avanzar 8 píxeles para el siguiente carácter
+    jmp .next_char
+    
+.done:
+    pop si
+    pop dx
+    pop cx
+    ret
+
+; ===============================
+; SUBRUTINA: LEER TECLA
+; ===============================
+read_key:
+    mov ah, 0x00
+    int 0x16
     ret
 
 ; ===============================
@@ -349,6 +452,7 @@ bot_move_left:
 bot_move_up:
     sub word [bot_y], 5
     ret
+
 
 ; ===============================
 ; SUBRUTINA: DIBUJAR RECTÁNGULO
@@ -528,11 +632,18 @@ draw_track:
     mov di, 225
     call draw_rectangle
 
+
     ret
+
+
 
 ; ===============================
 ; SUBRUTINA: COMPROBAR COLISIÓN 
 ; (Sólo Jugador 1 - verde)
+; ===============================
+; Si en el área del jugador hay al menos un píxel
+; de color 15 (blanco), se asume colisión y se
+; regresa al punto de partida (x=100, y=20).
 ; ===============================
 check_collision_player1:
     push ax
@@ -590,6 +701,7 @@ no_collision:
     pop bx
     pop ax
     ret
+
 
 ; ===============================
 ; SUBRUTINA: COMPROBAR COLISIÓN
@@ -651,6 +763,7 @@ no_collision_2:
     pop ax
     ret
 
+
 ; ===============================
 ; SECCIÓN DE DATOS
 ; ===============================
@@ -670,19 +783,33 @@ player2_height  dw 10
 old2_x          dw 100
 old2_y          dw 40
 
-bot_x           dw 100    ; Posición inicial en X
-bot_y           dw 55     ; Posición inicial en Y
-bot_color       db 1      ; Azul
-bot_width       dw 10     ; Ancho del bot
-bot_height      dw 10     ; Alto del bot
-old_bot_x       dw 100
-old_bot_y       dw 55
-bot_direction   db 1      ; 1=Derecha, 2=Abajo, 3=Izquierda, 4=Arriba
+
+bot_x          dw 100    ; Posición inicial en X
+bot_y          dw 55     ; Posición inicial en Y
+bot_color      db 1      ; Azul
+bot_width      dw 10     ; Ancho del bot
+bot_height     dw 10     ; Alto del bot
+old_bot_x      dw 100
+old_bot_y      dw 55
+bot_direction  db 1      ; 1=Derecha, 2=Abajo, 3=Izquierda, 4=Arriba
 
 ; Para la rutina de colisión
 x_off           dw 0
 y_off           dw 0
 
-; Para el temporizador (minimizado)
-timer           dw 60     ; Temporizador en segundos
-timer_counter   dw 0      ; Contador para reducir el temporizador
+; Para el temporizador
+timer_count     dw 60    ; Temporizador en segundos
+tick_counter    dw 0     ; Contador de ticks
+timer_updated   db 0     ; Flag para saber si se actualizó el temporizador
+old_timer_offset    dw 0 ; Para guardar el offset original del vector de interrupción
+old_timer_segment   dw 0 ; Para guardar el segmento original del vector de interrupción
+
+; Buffer para convertir números a ASCII
+number_buffer   db "     ", 0
+
+; Textos
+tiempo_texto    db "Tiempo: ", 0
+tiempo_agotado  db "TIEMPO AGOTADO", 0
+
+; Observa que aquí ya no utilizamos "TIMES 510 - ($-$$) db 0" ni "dw 0xAA55"
+; porque esto NO es un boot sector.
