@@ -3,8 +3,6 @@
 
 ; -----------------------------------------------------
 ; Stage 2 se carga en 0x1000:0 por boot1.
-; Al saltar aquí, CS=??? (pero normalmente 0x1000),
-; DS=0, ES=0 (puedes ajustar según necesites).
 ; -----------------------------------------------------
 
 inicio:
@@ -16,40 +14,83 @@ inicio:
     mov ax, 0x12
     int 0x10
 
+    ; Inicializar temporizador a 60
+    mov word [timer], 60
+
     ; Dibujar la pista (blanca)
     call draw_track
 
     ; ---- Jugador 1 (VERDE) ----
-    mov al, [player_color]  ; Color
-    mov cx, [player_x]      ; X
-    mov dx, [player_y]      ; Y
-    mov si, [player_width]  ; Ancho
-    mov di, [player_height] ; Alto
+    mov al, 2           ; Color verde
+    mov cx, 100         ; X
+    mov dx, 25          ; Y
+    mov si, 10          ; Ancho
+    mov di, 10          ; Alto
     call draw_rectangle
 
     ; ---- Jugador 2 (ROJO) ----
-    mov al, [player2_color]  
-    mov cx, [player2_x]      
-    mov dx, [player2_y]      
-    mov si, [player2_width]  
-    mov di, [player2_height] 
+    mov al, 4           ; Color rojo
+    mov cx, 100         ; X
+    mov dx, 40          ; Y
+    mov si, 10          ; Ancho
+    mov di, 10          ; Alto
     call draw_rectangle
 
-    ; BOT (dibujarlo aquí para que aparezca de inmediato)
-    mov al, [bot_color]
-    mov cx, [bot_x]
-    mov dx, [bot_y]
-    mov si, [bot_width]
-    mov di, [bot_height]
+    ; BOT (AZUL) ----
+    mov al, 1           ; Color azul
+    mov cx, 100         ; X
+    mov dx, 55          ; Y
+    mov si, 10          ; Ancho
+    mov di, 10          ; Alto
     call draw_rectangle
 
+    ; Resto del código original
+    mov byte [player_color], 2
+    mov word [player_x], 100
+    mov word [player_y], 25
+    mov word [player_width], 10
+    mov word [player_height], 10
+    mov word [old_x], 100
+    mov word [old_y], 20
+
+    mov byte [player2_color], 4
+    mov word [player2_x], 100
+    mov word [player2_y], 40
+    mov word [player2_width], 10
+    mov word [player2_height], 10
+    mov word [old2_x], 100
+    mov word [old2_y], 40
+
+    mov byte [bot_color], 1
+    mov word [bot_x], 100
+    mov word [bot_y], 55
+    mov word [bot_width], 10
+    mov word [bot_height], 10
+    mov word [old_bot_x], 100
+    mov word [old_bot_y], 55
+    mov byte [bot_direction], 1
+
+    ; Dibujar temporizador inicial
+    call draw_timer
 
 main_loop:
-    call check_timer
-    call display_timer 
-    cmp word [time_left], 0
-    je time_is_up
+    ; Actualizar temporizador
+    inc word [timer_counter]
+    cmp word [timer_counter], 30
+    jl skip_timer
+    
+    ; Reiniciar contador
+    mov word [timer_counter], 0
+    
+    ; Decrementar temporizador
+    cmp word [timer], 0
+    je game_over
+    dec word [timer]
+    
+    ; Actualizar visualización del temporizador
+    call draw_timer
 
+skip_timer:
     ; 1) Guardar las posiciones actuales (para borrarlas luego)
     mov ax, [player_x]
     mov [old_x], ax
@@ -61,12 +102,18 @@ main_loop:
     mov ax, [player2_y]
     mov [old2_y], ax
 
-    ; 2) Leer tecla
-    call read_key  ; AH=scancode, AL=ASCII
-
+    ; 2) Leer tecla (versión no bloqueante)
+    mov ah, 0x01
+    int 0x16
+    jz skip_key
+    
+    mov ah, 0x00
+    int 0x16
+    
     ; 3) Actualizar posiciones de los jugadores
     call update_position
 
+skip_key:
     ; 3b) Comprobar colisión del jugador 1 (verde) con la pista blanca
     call check_collision_player1
 
@@ -133,149 +180,65 @@ main_loop:
     mov di, [bot_height]
     call draw_rectangle
 
-
-
     jmp main_loop
 
-time_is_up:
-    ; Mensaje de “Fin del juego”
-    ; Determinar ganador, etc.
-    hlt
-    jmp time_is_up
-
-; --------------------------------------
-; start_timer: lee el contador BIOS (CX:DX)
-; y calcula end_time = DX + 1092 (para 60s)
-; --------------------------------------
-start_timer:
-    mov ah, 0
-    int 0x1A               ; CX:DX = ticks desde medianoche (18.2 Hz)
-    mov [start_ticks], cx  ; opcional, si quieres guardarlo
-    mov [start_ticks2], dx
-
-    ; Sumar 1092 a DX para 60s
-    mov ax, dx
-    add ax, 1092           ; 1092 = ~18.2 * 60
-    mov [end_ticks2], ax
-    mov [end_ticks], cx    ; sin cambios a CX
-
-    ; time_left = 60 (inicialmente)
-    mov word [time_left], 60
-    ret
-
-; --------------------------------------
-; check_timer: lee el tiempo actual y
-; comprueba si ya llegamos a end_time.
-;  - Si ya llegó, time_left=0
-;  - Si no, calcula time_left approx
-; --------------------------------------
-check_timer:
-    push ax
-    push bx
-    push cx
-    push dx
-    push ds       ; <--- PRESERVAR DS
-    push es       ; <--- PRESERVAR ES
-
-    mov ah, 0
-    int 0x1A      ; Puede alterar DS/ES
-
-    pop es        ; <--- RESTAURAR ES
-    pop ds        ; <--- RESTAURAR DS
-
-    ; Aquí DS vuelve a ser 0x1000
-    ; (el que configuraste al inicio)
-    ; ... y luego continúas con la lógica ...
-    
-    ; Comparar DX con end_ticks2, etc.
-    cmp dx, [end_ticks2]
-    jb  not_reached
-    mov word [time_left], 0
-    jmp short done_check
-
-not_reached:
-    mov ax, [end_ticks2]
-    sub ax, dx
-    mov bl, 18
-    div bl
-    mov [time_left], ax
-
-done_check:
-    pop dx
-    pop cx
-    pop bx
-    pop ax
-    ret
-
-
 ; ===============================
-; SUBRUTINA: LEER TECLA
+; SUBRUTINA: GAME OVER
 ; ===============================
-read_key:
-    ; Save registers that might be modified
-    push ds
-    push es
+game_over:
+    ; Pantalla roja
+    mov ax, 0x0600
+    mov bh, 4      ; Rojo
+    mov cx, 0
+    mov dx, 0x184F
+    int 0x10
     
-    ; Read key
-    mov ah, 0x00
+    ; Esperar tecla
+    mov ah, 0
     int 0x16
-    ; Key is now in AX (AH=scancode, AL=ASCII)
     
-    ; Restore registers
-    pop es
-    pop ds
-    ret  ; Return with key in AX
+    ; Reiniciar juego
+    jmp inicio
 
 ; ===============================
-; SUBRUTINA: MOSTRAR TIEMPO RESTANTE
+; SUBRUTINA: DIBUJAR TEMPORIZADOR
 ; ===============================
-display_timer:
-    ; Save registers
-    push ax
-    push bx
-    push cx
-    push dx
+draw_timer:
+    ; Borrar área del temporizador
+    mov al, 0               ; Negro
+    mov cx, 30              ; X
+    mov dx, 400             ; Y
+    mov si, 180             ; Ancho
+    mov di, 15              ; Alto
+    call draw_rectangle
     
-    ; Position cursor at top right
-    mov ah, 0x02    ; Set cursor position
-    mov bh, 0       ; Page 0
-    mov dh, 0       ; Row 0
-    mov dl, 70      ; Column 70
-    int 0x10
+    ; Elegir color según tiempo restante
+    mov al, 10              ; Verde por defecto
     
-    ; Display time
-    mov ax, [time_left]
-    mov bx, 10
-    mov cx, 0       ; Digit counter
+    cmp word [timer], 20
+    jg .dibujar
     
-    ; Convert to ASCII
-.convert_loop:
-    xor dx, dx      ; Clear high part of dividend
-    div bx          ; AX / 10, quotient in AX, remainder in DX
-    push dx         ; Push remainder (digit)
-    inc cx          ; Increment counter
-    test ax, ax     ; Check if quotient is zero
-    jnz .convert_loop
+    mov al, 14              ; Amarillo si < 20s
     
-    ; Display digits
-.display_loop:
-    pop dx          ; Get digit
-    add dl, '0'     ; Convert to ASCII
-    mov ah, 0x0E    ; Teletype output
-    mov al, dl      ; Character to display
-    int 0x10        ; Call BIOS
-    loop .display_loop
+    cmp word [timer], 10
+    jg .dibujar
     
-    ; Display "s" for seconds
-    mov ah, 0x0E
-    mov al, 's'
-    int 0x10
+    mov al, 4               ; Rojo si < 10s
     
-    ; Restore registers
-    pop dx
-    pop cx
-    pop bx
-    pop ax
+.dibujar:
+    ; Calcular ancho proporcional al tiempo
+    mov cx, 30              ; X
+    mov dx, 400             ; Y
+    
+    ; Ancho = timer * 3
+    mov ax, [timer]
+    mov bx, 3
+    mul bx
+    mov si, ax
+    
+    mov di, 15              ; Alto
+    call draw_rectangle
+    
     ret
 
 ; ===============================
@@ -386,7 +349,6 @@ bot_move_left:
 bot_move_up:
     sub word [bot_y], 5
     ret
-
 
 ; ===============================
 ; SUBRUTINA: DIBUJAR RECTÁNGULO
@@ -566,18 +528,11 @@ draw_track:
     mov di, 225
     call draw_rectangle
 
-
     ret
-
-
 
 ; ===============================
 ; SUBRUTINA: COMPROBAR COLISIÓN 
 ; (Sólo Jugador 1 - verde)
-; ===============================
-; Si en el área del jugador hay al menos un píxel
-; de color 15 (blanco), se asume colisión y se
-; regresa al punto de partida (x=100, y=20).
 ; ===============================
 check_collision_player1:
     push ax
@@ -635,7 +590,6 @@ no_collision:
     pop bx
     pop ax
     ret
-
 
 ; ===============================
 ; SUBRUTINA: COMPROBAR COLISIÓN
@@ -697,7 +651,6 @@ no_collision_2:
     pop ax
     ret
 
-
 ; ===============================
 ; SECCIÓN DE DATOS
 ; ===============================
@@ -717,29 +670,19 @@ player2_height  dw 10
 old2_x          dw 100
 old2_y          dw 40
 
-
-bot_x          dw 100    ; Posición inicial en X
-bot_y          dw 55     ; Posición inicial en Y
-bot_color      db 1      ; Azul
-bot_width      dw 10     ; Ancho del bot
-bot_height     dw 10     ; Alto del bot
-old_bot_x      dw 100
-old_bot_y      dw 55
-bot_direction  db 1  ; 1=Derecha, 2=Abajo, 3=Izquierda, 4=Arriba
+bot_x           dw 100    ; Posición inicial en X
+bot_y           dw 55     ; Posición inicial en Y
+bot_color       db 1      ; Azul
+bot_width       dw 10     ; Ancho del bot
+bot_height      dw 10     ; Alto del bot
+old_bot_x       dw 100
+old_bot_y       dw 55
+bot_direction   db 1      ; 1=Derecha, 2=Abajo, 3=Izquierda, 4=Arriba
 
 ; Para la rutina de colisión
 x_off           dw 0
 y_off           dw 0
 
-; Observa que aquí ya no utilizamos "TIMES 510 - ($-$$) db 0" ni "dw 0xAA55"
-; porque esto NO es un boot sector.
-
-; -------------------------
-; Variables para el cronómetro
-; -------------------------
-start_ticks dw 0      ; Guardará CX al iniciar
-start_ticks2 dw 0     ; Guardará DX al iniciar
-end_ticks   dw 0      ; Guardará CX cuando termine
-end_ticks2  dw 0      ; Guardará DX cuando termine
-
-time_left   dw 60     ; Segundos restantes (aprox)
+; Para el temporizador (minimizado)
+timer           dw 60     ; Temporizador en segundos
+timer_counter   dw 0      ; Contador para reducir el temporizador
