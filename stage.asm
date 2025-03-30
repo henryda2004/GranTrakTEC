@@ -231,6 +231,10 @@ done:
 ; SUBRUTINA: MOVER EL BOT
 ; ===============================
 move_bot:
+    ; Primero comprobar si ha llegado a un punto de cambio
+    call check_bot_waypoints
+    
+    ; Luego realizar el movimiento según la dirección actual
     cmp byte [bot_direction], 1  ; Derecha
     je bot_move_right
     cmp byte [bot_direction], 2  ; Abajo
@@ -257,6 +261,102 @@ bot_move_up:
     sub word [bot_y], 5
     ret
 
+; ===============================
+; SUBRUTINA: VERIFICAR PUNTOS DE CAMBIO DEL BOT
+; ===============================
+check_bot_waypoints:
+    ; Comprueba si el bot ha llegado al punto de cambio 1 (USANDO RANGOS)
+    mov ax, [bot_x]
+    sub ax, [waypoint1_x]     ; AX = bot_x - waypoint1_x
+    jns check_wp1_positive    ; Si es positivo, seguir
+    neg ax                    ; Si es negativo, hacerlo positivo
+check_wp1_positive:
+    cmp ax, [waypoint_range]  ; Comparar con el rango aceptable
+    ja check_waypoint2        ; Si está fuera del rango, comprobar el siguiente waypoint
+    
+    mov ax, [bot_y]
+    sub ax, [waypoint1_y]
+    jns check_wp1_y_positive
+    neg ax
+check_wp1_y_positive:
+    cmp ax, [waypoint_range]
+    ja check_waypoint2
+    
+    ; Si llegó aquí, el bot está en el rango del waypoint1
+    mov al, [waypoint1_dir]
+    mov [bot_direction], al
+    jmp end_check_waypoints
+    
+check_waypoint2:
+    ; Comprueba si el bot ha llegado al punto de cambio 2 (USANDO RANGOS)
+    mov ax, [bot_x]
+    sub ax, [waypoint2_x]
+    jns check_wp2_positive
+    neg ax
+check_wp2_positive:
+    cmp ax, [waypoint_range]
+    ja check_waypoint3
+    
+    mov ax, [bot_y]
+    sub ax, [waypoint2_y]
+    jns check_wp2_y_positive
+    neg ax
+check_wp2_y_positive:
+    cmp ax, [waypoint_range]
+    ja check_waypoint3
+    
+    ; Si llegó aquí, el bot está en el rango del waypoint2
+    mov al, [waypoint2_dir]
+    mov [bot_direction], al
+    jmp end_check_waypoints
+    
+check_waypoint3:
+    ; Comprueba si el bot ha llegado al punto de cambio 3 (USANDO RANGOS)
+    mov ax, [bot_x]
+    sub ax, [waypoint3_x]
+    jns check_wp3_positive
+    neg ax
+check_wp3_positive:
+    cmp ax, [waypoint_range]
+    ja check_waypoint4
+    
+    mov ax, [bot_y]
+    sub ax, [waypoint3_y]
+    jns check_wp3_y_positive
+    neg ax
+check_wp3_y_positive:
+    cmp ax, [waypoint_range]
+    ja check_waypoint4
+    
+    ; Si llegó aquí, el bot está en el rango del waypoint3
+    mov al, [waypoint3_dir]
+    mov [bot_direction], al
+    jmp end_check_waypoints
+
+check_waypoint4:
+    ; Comprueba si el bot ha llegado al punto de cambio 4 (USANDO RANGOS)
+    mov ax, [bot_x]
+    sub ax, [waypoint4_x]
+    jns check_wp4_positive
+    neg ax
+check_wp4_positive:
+    cmp ax, [waypoint_range]
+    ja end_check_waypoints
+    
+    mov ax, [bot_y]
+    sub ax, [waypoint4_y]
+    jns check_wp4_y_positive
+    neg ax
+check_wp4_y_positive:
+    cmp ax, [waypoint_range]
+    ja end_check_waypoints
+    
+    ; Si llegó aquí, el bot está en el rango del waypoint4
+    mov al, [waypoint4_dir]
+    mov [bot_direction], al
+    
+end_check_waypoints:
+    ret
 
 ; ===============================
 ; SUBRUTINA: DIBUJAR RECTÁNGULO
@@ -595,5 +695,24 @@ time_start      dw 0      ; Ticks iniciales (BIOS)
 time_current    dw 0      ; Ticks actuales
 time_seconds    dw 60     ; Segundos restantes
 time_str        db 'Time: 60', 0
+
+; Puntos de cambio de dirección para el bot
+waypoint_range dw 5      ; Rango de tolerancia en píxeles
+
+waypoint1_x    dw 580    ; Primer punto X
+waypoint1_y    dw 55     ; Primer punto Y
+waypoint1_dir  db 2      ; Nueva dirección (2=Abajo)
+
+waypoint2_x    dw 580    ; Segundo punto X
+waypoint2_y    dw 250    ; Segundo punto Y
+waypoint2_dir  db 3      ; Nueva dirección (3=Izquierda)
+
+waypoint3_x    dw 30    ; Tercer punto X
+waypoint3_y    dw 250    ; Tercer punto Y
+waypoint3_dir  db 4      ; Nueva dirección (4=Arriba)
+
+waypoint4_x    dw 30    ; Cuarto punto X
+waypoint4_y    dw 55     ; Cuarto punto Y
+waypoint4_dir  db 1      ; Nueva dirección (1=Derecha)
 ; Observa que aquí ya no utilizamos "TIMES 510 - ($-$$) db 0" ni "dw 0xAA55"
 ; porque esto NO es un boot sector.
