@@ -47,8 +47,8 @@ inicio:
     ; 7) Verificar si completó una vuelta
     call check_player1_lap
     
-    ; 8) Actualizar contador de vueltas
-    call update_lap_counter
+    call check_player2_lap
+    call update_lap_counter_p2
 
     ; ---- Jugador 1 (VERDE) ----
     mov al, [player_color]  ; Color
@@ -230,6 +230,8 @@ main_loop:
     ; -- Aquí invocas la comprobación de vuelta --
     call check_player1_lap
     call update_lap_counter
+    call check_player2_lap
+    call update_lap_counter_p2
 
     ; 6) Actualizar temporizador
     call update_timer
@@ -798,8 +800,8 @@ update_timer:
     mov bh, 0x00        ; Página 0
     mov bl, 0x0F        ; Color blanco sobre negro
     mov cx, 8           ; Longitud de la cadena
-    mov dh, 0           ; Fila 0
-    mov dl, 0           ; Columna 0
+    mov dh, 17           ; Fila 0
+    mov dl, 3           ; Columna 0
     mov bp, time_str
     int 0x10
 
@@ -1154,8 +1156,8 @@ update_lap_counter:
     mov bh, 0x00        ; Página 0
     mov bl, 0x0F        ; Color blanco sobre negro
     mov cx, 11          ; Longitud de la cadena
-    mov dh, 1           ; Fila 1 (debajo del tiempo)
-    mov dl, 0           ; Columna 0
+    mov dh, 17           ; Fila 1 (debajo del tiempo)
+    mov dl, 13           ; Columna 0
     mov bp, player1_lap_str
     int 0x10
     
@@ -1233,6 +1235,88 @@ check_player1_lap:
     popa
     ret
 
+check_player2_lap:
+    pusha
+    
+    ;-----------------------------------------
+    ; 1) Revisar si el jugador está en checkpoint1
+    ;-----------------------------------------
+    mov ax, [player2_x]
+    cmp ax, [checkpoint_x1]
+    jl .check_checkpoint2    ; Si x < checkpoint_x1, no está en checkpoint1
+    cmp ax, [checkpoint_x2]
+    jg .check_checkpoint2    ; Si x > checkpoint_x2, no está en checkpoint1
+    
+    mov ax, [player2_y]
+    cmp ax, [checkpoint_y1]
+    jl .check_checkpoint2
+    cmp ax, [checkpoint_y2]
+    jg .check_checkpoint2
+
+    ; El jugador 2 SÍ está en el Checkpoint1
+    cmp byte [checkpoint2_passed_p2], 1
+    jne .set_in_checkpoint      ; Si no pasó checkpoint2, no contamos vuelta
+
+    ; Aquí se verifica que pasó el Checkpoint2, sumar vuelta
+    inc word [player2_laps]
+    mov byte [checkpoint2_passed_p2], 0  ; Reset para la próxima vuelta
+
+.set_in_checkpoint:
+    mov byte [in_checkpoint_p2], 1
+    jmp .done
+
+;-----------------------------------------
+; 2) Revisar si el jugador está en checkpoint2
+;-----------------------------------------
+.check_checkpoint2:
+    mov ax, [player2_x]
+    cmp ax, [checkpoint2_x1]
+    jl .not_in_checkpoint
+    cmp ax, [checkpoint2_x2]
+    jg .not_in_checkpoint
+
+    mov ax, [player2_y]
+    cmp ax, [checkpoint2_y1]
+    jl .not_in_checkpoint
+    cmp ax, [checkpoint2_y2]
+    jg .not_in_checkpoint
+
+    ; El jugador 2 SÍ está en el Checkpoint2
+    cmp byte [in_checkpoint_p2], 1
+    jne .done
+
+    ; Confirmar paso por Checkpoint2
+    mov byte [checkpoint2_passed_p2], 1
+    mov byte [in_checkpoint_p2], 0
+
+    jmp .done
+
+.not_in_checkpoint:
+    ; No está en ningún checkpoint
+.done:
+    popa
+    ret
+update_lap_counter_p2:
+    pusha
+    
+    ; Actualizar la cadena con el número actual de vueltas
+    mov di, player2_lap_str + 9  ; Posición del número en "P2 Laps: 00"
+    mov ax, [player2_laps]
+    call word_to_ascii
+    
+    ; Dibujar el contador en (0,2) - Justo debajo del contador del Player 1
+    mov ah, 0x13        ; Función BIOS: Escribir cadena
+    mov al, 0x01        ; Modo de escritura (actualizar posición)
+    mov bh, 0x00        ; Página 0
+    mov bl, 0x0F        ; Color blanco sobre negro
+    mov cx, 11          ; Longitud de la cadena
+    mov dh, 17           ; Fila 2
+    mov dl, 26           ; Columna 0
+    mov bp, player2_lap_str
+    int 0x10
+    
+    popa
+    ret
 
 ; ===============================
 ; SECCIÓN DE DATOS
@@ -1338,6 +1422,11 @@ checkpoint2_x2    dw 600    ; X max of the second checkpoint
 checkpoint2_y1    dw 200    ; Y min of the second checkpoint
 checkpoint2_y2    dw 300    ; Y max of the second checkpoint
 checkpoint2_passed db 0     ; Flag to indicate if checkpoint2 has been passed
+
+player2_laps     dw 0      ; Vueltas del jugador 2
+player2_lap_str  db 'P2 Laps: 00', 0  ; Cadena para mostrar
+checkpoint2_passed_p2 db 0     ; Flag para Player 2
+in_checkpoint_p2    db 0      ; Flag para indicar si está en el checkpoint
 
 ; Observa que aquí ya no utilizamos "TIMES 510 - ($-$$) db 0" ni "dw 0xAA55"
 ; porque esto NO es un boot sector.
