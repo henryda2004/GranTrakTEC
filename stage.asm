@@ -50,6 +50,15 @@ inicio:
     call check_player2_lap
     call update_lap_counter_p2
 
+    call check_bot1_lap
+    call update_lap_counter_bot1
+
+    call check_bot2_lap
+    call update_lap_counter_bot2
+
+    call check_bot3_lap
+    call update_lap_counter_bot3
+
     ; ---- Jugador 1 (VERDE) ----
     mov al, [player_color]  ; Color
     mov cx, [player_x]      ; X
@@ -232,6 +241,16 @@ main_loop:
     call update_lap_counter
     call check_player2_lap
     call update_lap_counter_p2
+
+    ; Verificar vueltas de los bots
+    call check_bot1_lap
+    call update_lap_counter_bot1
+
+    call check_bot2_lap
+    call update_lap_counter_bot2
+
+    call check_bot3_lap
+    call update_lap_counter_bot3
 
     ; 6) Actualizar temporizador
     call update_timer
@@ -1318,6 +1337,240 @@ update_lap_counter_p2:
     popa
     ret
 
+check_bot1_lap:
+    pusha
+    
+    ;-----------------------------------------
+    ; 1) Revisar si el bot está en checkpoint1
+    ;-----------------------------------------
+    mov ax, [bot_x]
+    cmp ax, [checkpoint_x1]
+    jl .check_checkpoint2
+    cmp ax, [checkpoint_x2]
+    jg .check_checkpoint2
+    
+    mov ax, [bot_y]
+    cmp ax, [checkpoint_y1]
+    jl .check_checkpoint2
+    cmp ax, [checkpoint_y2]
+    jg .check_checkpoint2
+
+    ; Si pasó checkpoint2, sumar vuelta
+    cmp byte [checkpoint2_passed_bot1], 1
+    jne .set_in_checkpoint
+
+    inc word [bot1_laps]
+    mov byte [checkpoint2_passed_bot1], 0
+
+.set_in_checkpoint:
+    mov byte [in_checkpoint_bot1], 1
+    jmp .done
+
+;-----------------------------------------
+; 2) Revisar si el bot está en checkpoint2
+;-----------------------------------------
+.check_checkpoint2:
+    mov ax, [bot_x]
+    cmp ax, [checkpoint2_x1]
+    jl .not_in_checkpoint
+    cmp ax, [checkpoint2_x2]
+    jg .not_in_checkpoint
+
+    mov ax, [bot_y]
+    cmp ax, [checkpoint2_y1]
+    jl .not_in_checkpoint
+    cmp ax, [checkpoint2_y2]
+    jg .not_in_checkpoint
+
+    ; Si estaba en checkpoint1, marcar checkpoint2 como pasado
+    cmp byte [in_checkpoint_bot1], 1
+    jne .done
+
+    mov byte [checkpoint2_passed_bot1], 1
+    mov byte [in_checkpoint_bot1], 0
+
+.not_in_checkpoint:
+.done:
+    popa
+    ret
+update_lap_counter_bot1:
+    pusha
+    
+    ; Actualizar la cadena con el número actual de vueltas
+    mov di, bot1_lap_str + 9  ; Posición del número en "Bot1 Laps: 00"
+    mov ax, [bot1_laps]
+    call word_to_ascii
+    
+    ; Dibujar en pantalla (fila 3 para bot 1)
+    mov ah, 0x13
+    mov al, 0x01
+    mov bh, 0x00
+    mov bl, 0x0F
+    mov cx, 11
+    mov dh, 17
+    mov dl, 39
+    mov bp, bot1_lap_str
+    int 0x10
+    
+    popa
+    ret
+
+check_bot2_lap:
+    pusha
+    
+    ;-----------------------------------------
+    ; 1) Revisar si el bot está en checkpoint1
+    ;-----------------------------------------
+    mov ax, [bot2_x]
+    cmp ax, [checkpoint_x1]
+    jl .check_checkpoint2
+    cmp ax, [checkpoint_x2]
+    jg .check_checkpoint2
+    
+    mov ax, [bot2_y]
+    cmp ax, [checkpoint_y1]
+    jl .check_checkpoint2
+    cmp ax, [checkpoint_y2]
+    jg .check_checkpoint2
+
+    ; Si pasó checkpoint2, sumar vuelta
+    cmp byte [checkpoint2_passed_bot2], 1
+    jne .set_in_checkpoint
+
+    inc word [bot2_laps]
+    mov byte [checkpoint2_passed_bot2], 0
+
+.set_in_checkpoint:
+    mov byte [in_checkpoint_bot2], 1
+    jmp .done
+
+;-----------------------------------------
+; 2) Revisar si el bot está en checkpoint2
+;-----------------------------------------
+.check_checkpoint2:
+    mov ax, [bot2_x]
+    cmp ax, [checkpoint2_x1]
+    jl .not_in_checkpoint
+    cmp ax, [checkpoint2_x2]
+    jg .not_in_checkpoint
+
+    mov ax, [bot2_y]
+    cmp ax, [checkpoint2_y1]
+    jl .not_in_checkpoint
+    cmp ax, [checkpoint2_y2]
+    jg .not_in_checkpoint
+
+    ; Si estaba en checkpoint1, marcar checkpoint2 como pasado
+    cmp byte [in_checkpoint_bot2], 1
+    jne .done
+
+    mov byte [checkpoint2_passed_bot2], 1
+    mov byte [in_checkpoint_bot2], 0
+
+.not_in_checkpoint:
+.done:
+    popa
+    ret
+update_lap_counter_bot2:
+    pusha
+    
+    ; Actualizar la cadena con el número actual de vueltas
+    mov di, bot2_lap_str + 9  ; Posición del número en "Bot1 Laps: 00"
+    mov ax, [bot2_laps]
+    call word_to_ascii
+    
+    ; Dibujar en pantalla (fila 3 para bot 1)
+    mov ah, 0x13
+    mov al, 0x01
+    mov bh, 0x00
+    mov bl, 0x0F
+    mov cx, 11
+    mov dh, 17
+    mov dl, 52
+    mov bp, bot2_lap_str
+    int 0x10
+    
+    popa
+    ret
+
+
+check_bot3_lap:
+    pusha
+    
+    ;-----------------------------------------
+    ; 1) Revisar si el bot está en checkpoint1
+    ;-----------------------------------------
+    mov ax, [bot3_x]
+    cmp ax, [checkpoint_x1]
+    jl .check_checkpoint2
+    cmp ax, [checkpoint_x2]
+    jg .check_checkpoint2
+    
+    mov ax, [bot3_y]
+    cmp ax, [checkpoint_y1]
+    jl .check_checkpoint2
+    cmp ax, [checkpoint_y2]
+    jg .check_checkpoint2
+
+    ; Si pasó checkpoint2, sumar vuelta
+    cmp byte [checkpoint2_passed_bot3], 1
+    jne .set_in_checkpoint
+
+    inc word [bot3_laps]
+    mov byte [checkpoint2_passed_bot3], 0
+
+.set_in_checkpoint:
+    mov byte [in_checkpoint_bot3], 1
+    jmp .done
+
+;-----------------------------------------
+; 2) Revisar si el bot está en checkpoint2
+;-----------------------------------------
+.check_checkpoint2:
+    mov ax, [bot3_x]
+    cmp ax, [checkpoint2_x1]
+    jl .not_in_checkpoint
+    cmp ax, [checkpoint2_x2]
+    jg .not_in_checkpoint
+
+    mov ax, [bot3_y]
+    cmp ax, [checkpoint2_y1]
+    jl .not_in_checkpoint
+    cmp ax, [checkpoint2_y2]
+    jg .not_in_checkpoint
+
+    ; Si estaba en checkpoint1, marcar checkpoint2 como pasado
+    cmp byte [in_checkpoint_bot3], 1
+    jne .done
+
+    mov byte [checkpoint2_passed_bot3], 1
+    mov byte [in_checkpoint_bot3], 0
+
+.not_in_checkpoint:
+.done:
+    popa
+    ret
+update_lap_counter_bot3:
+    pusha
+    
+    ; Actualizar la cadena con el número actual de vueltas
+    mov di, bot3_lap_str + 9  ; Posición del número en "Bot1 Laps: 00"
+    mov ax, [bot3_laps]
+    call word_to_ascii
+    
+    ; Dibujar en pantalla (fila 3 para bot 1)
+    mov ah, 0x13
+    mov al, 0x01
+    mov bh, 0x00
+    mov bl, 0x0F
+    mov cx, 11
+    mov dh, 17
+    mov dl, 65
+    mov bp, bot3_lap_str
+    int 0x10
+    
+    popa
+    ret
 ; ===============================
 ; SECCIÓN DE DATOS
 ; ===============================
@@ -1427,6 +1680,25 @@ player2_laps     dw 0      ; Vueltas del jugador 2
 player2_lap_str  db 'P2 Laps: 00', 0  ; Cadena para mostrar
 checkpoint2_passed_p2 db 0     ; Flag para Player 2
 in_checkpoint_p2    db 0      ; Flag para indicar si está en el checkpoint
+
+
+; Bot 1
+bot1_laps       dw 0      ; Vueltas del bot 1
+bot1_lap_str    db 'P3 Laps: 00', 0
+checkpoint2_passed_bot1 db 0
+in_checkpoint_bot1 db 0
+
+; Bot 2
+bot2_laps       dw 0      ; Vueltas del bot 2
+bot2_lap_str    db 'P4 Laps: 00', 0
+checkpoint2_passed_bot2 db 0
+in_checkpoint_bot2 db 0
+
+; Bot 3
+bot3_laps       dw 0      ; Vueltas del bot 3
+bot3_lap_str    db 'P5 Laps: 00', 0
+checkpoint2_passed_bot3 db 0
+in_checkpoint_bot3 db 0
 
 ; Observa que aquí ya no utilizamos "TIMES 510 - ($-$$) db 0" ni "dw 0xAA55"
 ; porque esto NO es un boot sector.
