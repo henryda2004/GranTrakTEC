@@ -15,6 +15,25 @@ inicio:
     ; Cambiar a modo gráfico 0x12 (640x480, 16 colores)
     mov ax, 0x12
     int 0x10
+
+    ; 1) Inicializamos la semilla
+    call init_random_seed
+
+    ; 2) Asignamos velocidades aleatorias a cada bot en el rango 5..20
+    mov bx, 5
+    mov cx, 15
+    call random_range
+    mov [bot_speed], ax
+
+    mov bx, 5
+    mov cx, 15
+    call random_range
+    mov [bot2_speed], ax
+
+    mov bx, 5
+    mov cx, 15
+    call random_range
+    mov [bot3_speed], ax
     ; Inicializar temporizador (obtener ticks iniciales)
     mov ah, 0x00
     int 0x1A
@@ -23,7 +42,13 @@ inicio:
     ; Dibujar elementos iniciales
     call draw_track
     call update_timer  ; Mostrar tiempo inicial
+    call update_lap_counter  ; Mostrar contador inicial
 
+    ; 7) Verificar si completó una vuelta
+    call check_player1_lap
+    
+    ; 8) Actualizar contador de vueltas
+    call update_lap_counter
 
     ; ---- Jugador 1 (VERDE) ----
     mov al, [player_color]  ; Color
@@ -47,6 +72,22 @@ inicio:
     mov dx, [bot_y]
     mov si, [bot_width]
     mov di, [bot_height]
+    call draw_rectangle
+
+    ; BOT 2 
+    mov al, [bot2_color]
+    mov cx, [bot2_x]
+    mov dx, [bot2_y]
+    mov si, [bot2_width]
+    mov di, [bot2_height]
+    call draw_rectangle
+
+    ; BOT 3
+    mov al, [bot3_color]
+    mov cx, [bot3_x]
+    mov dx, [bot3_y]
+    mov si, [bot3_width]
+    mov di, [bot3_height]
     call draw_rectangle
 
 
@@ -134,6 +175,62 @@ main_loop:
     mov di, [bot_height]
     call draw_rectangle
 
+    ; === BOT 2 ===
+    ; 1) Guardar pos anterior
+    mov ax, [bot2_x]
+    mov [old_bot2_x], ax
+    mov ax, [bot2_y]
+    mov [old_bot2_y], ax
+
+    ; 2) Mover bot 2
+    call move_bot2
+
+    ; 3) Borrar bot anterior
+    mov al, 0
+    mov cx, [old_bot2_x]
+    mov dx, [old_bot2_y]
+    mov si, [bot2_width]
+    mov di, [bot2_height]
+    call draw_rectangle
+
+    ; 4) Dibujar bot en nueva posición
+    mov al, [bot2_color]
+    mov cx, [bot2_x]
+    mov dx, [bot2_y]
+    mov si, [bot2_width]
+    mov di, [bot2_height]
+    call draw_rectangle
+
+    ; === BOT 3 ===
+    ; 1) Guardar pos anterior
+    mov ax, [bot3_x]
+    mov [old_bot3_x], ax
+    mov ax, [bot3_y]
+    mov [old_bot3_y], ax
+
+    ; 2) Mover bot 3
+    call move_bot3
+
+    ; 3) Borrar bot anterior
+    mov al, 0
+    mov cx, [old_bot3_x]
+    mov dx, [old_bot3_y]
+    mov si, [bot3_width]
+    mov di, [bot3_height]
+    call draw_rectangle
+
+    ; 4) Dibujar bot en nueva posición
+    mov al, [bot3_color]
+    mov cx, [bot3_x]
+    mov dx, [bot3_y]
+    mov si, [bot3_width]
+    mov di, [bot3_height]
+    call draw_rectangle
+
+    ; -- Aquí invocas la comprobación de vuelta --
+    call check_player1_lap
+    call update_lap_counter
+
     ; 6) Actualizar temporizador
     call update_timer
 
@@ -178,50 +275,50 @@ update_position:
 move_up_1:
     cmp word [player_y], 1
     jle done
-    sub word [player_y], 5
+    sub word [player_y], 10
     jmp done
 
 move_down_1:
     cmp word [player_y], 470
     jge done
-    add word [player_y], 5
+    add word [player_y], 10
     jmp done
 
 move_left_1:
     cmp word [player_x], 1
     jle done
-    sub word [player_x], 5
+    sub word [player_x], 10
     jmp done
 
 move_right_1:
     cmp word [player_x], 630
     jge done
-    add word [player_x], 5
+    add word [player_x], 10
     jmp done
 
 ; === Jugador 2 (rojo) ===
 move_up_2:
     cmp word [player2_y], 1
     jle done
-    sub word [player2_y], 5
+    sub word [player2_y], 10
     jmp done
 
 move_down_2:
     cmp word [player2_y], 470
     jge done
-    add word [player2_y], 5
+    add word [player2_y], 10
     jmp done
 
 move_left_2:
     cmp word [player2_x], 1
     jle done
-    sub word [player2_x], 5
+    sub word [player2_x], 10
     jmp done
 
 move_right_2:
     cmp word [player2_x], 630
     jge done
-    add word [player2_x], 5
+    add word [player2_x], 10
     jmp done
 
 done:
@@ -246,21 +343,100 @@ move_bot:
     ret
 
 bot_move_right:
-    add word [bot_x], 5
+    mov cx, [bot_speed]
+    add word [bot_x], cx
     ret
 
 bot_move_down:
-    add word [bot_y], 5
+    mov cx, [bot_speed]
+    add word [bot_y], cx
     ret
 
 bot_move_left:
-    sub word [bot_x], 5
+    mov cx, [bot_speed]
+    sub word [bot_x], cx
     ret
 
 bot_move_up:
-    sub word [bot_y], 5
+    mov cx, [bot_speed]
+    sub word [bot_y], cx
     ret
 
+; ===============================
+; SUBRUTINA: MOVER EL BOT 2
+; ===============================
+move_bot2:
+    ; Comprobar si ha llegado a un punto de cambio
+    call check_bot2_waypoints
+    
+    ; Realizar el movimiento según la dirección actual
+    cmp byte [bot2_direction], 1  ; Derecha
+    je bot2_move_right
+    cmp byte [bot2_direction], 2  ; Abajo
+    je bot2_move_down
+    cmp byte [bot2_direction], 3  ; Izquierda
+    je bot2_move_left
+    cmp byte [bot2_direction], 4  ; Arriba
+    je bot2_move_up
+    ret
+
+bot2_move_right:
+    mov cx, [bot2_speed]
+    add word [bot2_x], cx
+    ret
+
+bot2_move_down:
+    mov cx, [bot2_speed]
+    add word [bot2_y], cx
+    ret
+
+bot2_move_left:
+    mov cx, [bot2_speed]
+    sub word [bot2_x], cx
+    ret
+
+bot2_move_up:
+    mov cx, [bot2_speed]
+    sub word [bot2_y], cx
+    ret
+    
+; ===============================
+; SUBRUTINA: MOVER EL BOT 3
+; ===============================
+move_bot3:
+    ; Comprobar si ha llegado a un punto de cambio
+    call check_bot3_waypoints
+    
+    ; Realizar el movimiento según la dirección actual
+    cmp byte [bot3_direction], 1  ; Derecha
+    je bot3_move_right
+    cmp byte [bot3_direction], 2  ; Abajo
+    je bot3_move_down
+    cmp byte [bot3_direction], 3  ; Izquierda
+    je bot3_move_left
+    cmp byte [bot3_direction], 4  ; Arriba
+    je bot3_move_up
+    ret
+
+bot3_move_right:
+    mov cx, [bot3_speed]
+    add word [bot3_x], cx
+    ret
+
+bot3_move_down:
+    mov cx, [bot3_speed]
+    add word [bot3_y], cx
+    ret
+
+bot3_move_left:
+    mov cx, [bot3_speed]
+    sub word [bot3_x], cx
+    ret
+
+bot3_move_up:
+    mov cx, [bot3_speed]
+    sub word [bot3_y], cx
+    ret
 ; ===============================
 ; SUBRUTINA: VERIFICAR PUNTOS DE CAMBIO DEL BOT
 ; ===============================
@@ -356,6 +532,205 @@ check_wp4_y_positive:
     mov [bot_direction], al
     
 end_check_waypoints:
+    ret
+
+
+; ===============================
+; SUBRUTINA: VERIFICAR PUNTOS DE CAMBIO DEL BOT 2
+; ===============================
+check_bot2_waypoints:
+    ; Bot 2 usa los mismos waypoints que el bot 1
+    
+    ; Comprueba si el bot 2 ha llegado al punto de cambio 1
+    mov ax, [bot2_x]
+    sub ax, [waypoint1_x]
+    jns check_wp1_bot2_positive
+    neg ax
+check_wp1_bot2_positive:
+    cmp ax, [waypoint_range]
+    ja check_waypoint2_bot2
+    
+    mov ax, [bot2_y]
+    sub ax, [waypoint1_y]
+    jns check_wp1_y_bot2_positive
+    neg ax
+check_wp1_y_bot2_positive:
+    cmp ax, [waypoint_range]
+    ja check_waypoint2_bot2
+    
+    ; Bot 2 está en el rango del waypoint1
+    mov al, [waypoint1_dir]
+    mov [bot2_direction], al
+    jmp end_check_waypoints_bot2
+    
+check_waypoint2_bot2:
+    ; Comprueba waypoint 2
+    mov ax, [bot2_x]
+    sub ax, [waypoint2_x]
+    jns check_wp2_bot2_positive
+    neg ax
+check_wp2_bot2_positive:
+    cmp ax, [waypoint_range]
+    ja check_waypoint3_bot2
+    
+    mov ax, [bot2_y]
+    sub ax, [waypoint2_y]
+    jns check_wp2_y_bot2_positive
+    neg ax
+check_wp2_y_bot2_positive:
+    cmp ax, [waypoint_range]
+    ja check_waypoint3_bot2
+    
+    ; Bot 2 está en el rango del waypoint2
+    mov al, [waypoint2_dir]
+    mov [bot2_direction], al
+    jmp end_check_waypoints_bot2
+    
+check_waypoint3_bot2:
+    ; Comprueba waypoint 3
+    mov ax, [bot2_x]
+    sub ax, [waypoint3_x]
+    jns check_wp3_bot2_positive
+    neg ax
+check_wp3_bot2_positive:
+    cmp ax, [waypoint_range]
+    ja check_waypoint4_bot2
+    
+    mov ax, [bot2_y]
+    sub ax, [waypoint3_y]
+    jns check_wp3_y_bot2_positive
+    neg ax
+check_wp3_y_bot2_positive:
+    cmp ax, [waypoint_range]
+    ja check_waypoint4_bot2
+    
+    ; Bot 2 está en el rango del waypoint3
+    mov al, [waypoint3_dir]
+    mov [bot2_direction], al
+    jmp end_check_waypoints_bot2
+
+check_waypoint4_bot2:
+    ; Comprueba waypoint 4
+    mov ax, [bot2_x]
+    sub ax, [waypoint4_x]
+    jns check_wp4_bot2_positive
+    neg ax
+check_wp4_bot2_positive:
+    cmp ax, [waypoint_range]
+    ja end_check_waypoints_bot2
+    
+    mov ax, [bot2_y]
+    sub ax, [waypoint4_y]
+    jns check_wp4_y_bot2_positive
+    neg ax
+check_wp4_y_bot2_positive:
+    cmp ax, [waypoint_range]
+    ja end_check_waypoints_bot2
+    
+    ; Bot 2 está en el rango del waypoint4
+    mov al, [waypoint4_dir]
+    mov [bot2_direction], al
+    
+end_check_waypoints_bot2:
+    ret
+
+; ===============================
+; SUBRUTINA: VERIFICAR PUNTOS DE CAMBIO DEL BOT 3
+; ===============================
+check_bot3_waypoints:
+    ; Bot 3 usa los mismos waypoints que los otros bots
+    
+    ; Comprueba si el bot 3 ha llegado al punto de cambio 1
+    mov ax, [bot3_x]
+    sub ax, [waypoint1_x]
+    jns check_wp1_bot3_positive
+    neg ax
+check_wp1_bot3_positive:
+    cmp ax, [waypoint_range]
+    ja check_waypoint2_bot3
+    
+    mov ax, [bot3_y]
+    sub ax, [waypoint1_y]
+    jns check_wp1_y_bot3_positive
+    neg ax
+check_wp1_y_bot3_positive:
+    cmp ax, [waypoint_range]
+    ja check_waypoint2_bot3
+    
+    ; Bot 3 está en el rango del waypoint1
+    mov al, [waypoint1_dir]
+    mov [bot3_direction], al
+    jmp end_check_waypoints_bot3
+    
+check_waypoint2_bot3:
+    ; Comprueba waypoint 2
+    mov ax, [bot3_x]
+    sub ax, [waypoint2_x]
+    jns check_wp2_bot3_positive
+    neg ax
+check_wp2_bot3_positive:
+    cmp ax, [waypoint_range]
+    ja check_waypoint3_bot3
+    
+    mov ax, [bot3_y]
+    sub ax, [waypoint2_y]
+    jns check_wp2_y_bot3_positive
+    neg ax
+check_wp2_y_bot3_positive:
+    cmp ax, [waypoint_range]
+    ja check_waypoint3_bot3
+    
+    ; Bot 3 está en el rango del waypoint2
+    mov al, [waypoint2_dir]
+    mov [bot3_direction], al
+    jmp end_check_waypoints_bot3
+    
+check_waypoint3_bot3:
+    ; Comprueba waypoint 3
+    mov ax, [bot3_x]
+    sub ax, [waypoint3_x]
+    jns check_wp3_bot3_positive
+    neg ax
+check_wp3_bot3_positive:
+    cmp ax, [waypoint_range]
+    ja check_waypoint4_bot3
+    
+    mov ax, [bot3_y]
+    sub ax, [waypoint3_y]
+    jns check_wp3_y_bot3_positive
+    neg ax
+check_wp3_y_bot3_positive:
+    cmp ax, [waypoint_range]
+    ja check_waypoint4_bot3
+    
+    ; Bot 3 está en el rango del waypoint3
+    mov al, [waypoint3_dir]
+    mov [bot3_direction], al
+    jmp end_check_waypoints_bot3
+
+check_waypoint4_bot3:
+    ; Comprueba waypoint 4
+    mov ax, [bot3_x]
+    sub ax, [waypoint4_x]
+    jns check_wp4_bot3_positive
+    neg ax
+check_wp4_bot3_positive:
+    cmp ax, [waypoint_range]
+    ja end_check_waypoints_bot3
+    
+    mov ax, [bot3_y]
+    sub ax, [waypoint4_y]
+    jns check_wp4_y_bot3_positive
+    neg ax
+check_wp4_y_bot3_positive:
+    cmp ax, [waypoint_range]
+    ja end_check_waypoints_bot3
+    
+    ; Bot 3 está en el rango del waypoint4
+    mov al, [waypoint4_dir]
+    mov [bot3_direction], al
+    
+end_check_waypoints_bot3:
     ret
 
 ; ===============================
@@ -583,7 +958,7 @@ outer_y_loop:
 
 collision_detected:
     ; Restaurar posición (punto de partida)
-    mov word [player_x], 100
+    mov word [player_x], 110
     mov word [player_y], 20
 
 no_collision:
@@ -644,7 +1019,7 @@ outer_y_loop_2:
 
 collision_detected_2:
     ; Restaurar posición inicial del Jugador 2 (rojo)
-    mov word [player2_x], 100
+    mov word [player2_x], 110
     mov word [player2_y], 40
 
 no_collision_2:
@@ -654,6 +1029,208 @@ no_collision_2:
     pop cx
     pop bx
     pop ax
+    ret
+
+
+; ========================================
+; SUBRUTINA: INIT_RANDOM_SEED
+;  - Inicializa la semilla con los ticks del BIOS
+; ========================================
+init_random_seed:
+    push ax
+    push dx
+    
+    mov ah, 0x00   ; Función 0 de int 1Ah -> get system time
+    int 0x1A
+    ; DX contiene los ticks (parte baja)
+    mov [random_seed], dx
+    
+    ; Asegurarse que la semilla nunca sea 0
+    cmp word [random_seed], 0
+    jne .seed_ok
+    mov word [random_seed], 1234  ; Valor alternativo si es 0
+    
+.seed_ok:
+    pop dx
+    pop ax
+    ret
+
+
+; ========================================
+; SUBRUTINA: RANDOM_LCG
+;  - Generador pseudoaleatorio (lineal congruencial)
+;  - Devuelve en AX el nuevo valor pseudoaleatorio
+;    (y lo deja guardado en random_seed).
+; ========================================
+random_lcg:
+    ; Formula típica: seed = (seed * A + C) mod 65536
+    push bx
+    push cx
+    push dx
+    
+    ; Asegurarse que la semilla nunca sea 0
+    cmp word [random_seed], 0
+    jne .seed_not_zero
+    mov word [random_seed], 1234  ; Valor alternativo si es 0
+    
+.seed_not_zero:
+    mov ax, [random_seed]
+    mov cx, 25173         ; Valor A: 25173 (0x6253)
+    mul cx                ; DX:AX = AX * CX
+    add ax, 13849         ; Valor C: 13849 (0x3619)
+    ; (mod 65536) es automático en 16 bits
+    mov [random_seed], ax
+    
+    pop dx
+    pop cx
+    pop bx
+    ret
+
+
+; ========================================
+; SUBRUTINA: RANDOM_RANGE
+;  - Genera un número en el rango [BX, CX]
+;  - Devuelve en AX el número.
+;  - Ejemplo de uso:
+;       mov bx, 5   ; Mínimo
+;       mov cx, 20  ; Máximo
+;       call random_range
+;       ; AX = valor en [5..20]
+; ========================================
+random_range:
+    push dx
+    push bx
+    push cx
+
+    ; 1) Llamamos a random_lcg para obtener un pseudoaleatorio en AX
+    call random_lcg
+
+    ; 2) Guardar los valores min/max
+    mov dx, cx      ; DX = max
+    sub dx, bx      ; DX = max - min
+    inc dx          ; DX = max - min + 1 (rango)
+
+    ; Si el rango es 0, devolver el mínimo
+    cmp dx, 0
+    jne .continue
+    mov ax, bx      ; Devolver mínimo
+    jmp .done
+
+.continue:
+    ; 3) AX = AX mod rango
+    xor cx, cx      ; Limpiar CX para la división
+    push dx         ; Guardar el rango
+    xor dx, dx      ; Limpiar DX para la división
+    
+    pop cx          ; CX = rango
+    div cx          ; AX = AX / CX, DX = AX mod CX
+    
+    mov ax, dx      ; AX = AX mod rango
+
+    ; 4) Sumamos el mínimo
+    add ax, bx      ; AX = (AX mod rango) + min
+
+.done:
+    pop cx
+    pop bx
+    pop dx
+    ret
+
+
+; ===============================
+; SUBRUTINA: ACTUALIZAR CONTADOR DE VUELTAS
+; ===============================
+update_lap_counter:
+    pusha
+    
+    ; Actualizar la cadena con el número actual de vueltas
+    mov di, player1_lap_str + 9  ; Posición del número en "P1 Laps: 00"
+    mov ax, [player1_laps]
+    call word_to_ascii
+    
+    ; Dibujar el contador en (0,1) - justo debajo del tiempo
+    mov ah, 0x13        ; Función BIOS: Escribir cadena
+    mov al, 0x01        ; Modo de escritura (actualizar posición)
+    mov bh, 0x00        ; Página 0
+    mov bl, 0x0F        ; Color blanco sobre negro
+    mov cx, 11          ; Longitud de la cadena
+    mov dh, 1           ; Fila 1 (debajo del tiempo)
+    mov dl, 0           ; Columna 0
+    mov bp, player1_lap_str
+    int 0x10
+    
+    popa
+    ret
+
+
+; ===============================
+; SUBRUTINA: VERIFICAR VUELTAS DEL JUGADOR 1
+; ===============================
+; Add a second checkpoint on the opposite side of the track
+; Modify the check_player1_lap routine to implement a two-checkpoint system
+
+check_player1_lap:
+    pusha
+    
+    ;-----------------------------------------
+    ; 1) Revisar si el jugador está en checkpoint1
+    ;-----------------------------------------
+    mov ax, [player_x]
+    cmp ax, [checkpoint_x1]
+    jl .check_checkpoint2    ; si x < checkpoint_x1, no está en checkpoint1
+    cmp ax, [checkpoint_x2]
+    jg .check_checkpoint2    ; si x > checkpoint_x2, no está en checkpoint1
+    
+    mov ax, [player_y]
+    cmp ax, [checkpoint_y1]
+    jl .check_checkpoint2
+    cmp ax, [checkpoint_y2]
+    jg .check_checkpoint2
+
+    ; => El jugador SÍ está dentro de las coords del Checkpoint1
+    ; Si ya había pasado el checkpoint2, completamos la vuelta
+    cmp byte [checkpoint2_passed], 1
+    jne .set_in_checkpoint      ; si no pasó checkpoint2, no contamos vuelta
+
+    ; aquí es que checkpoint2_passed = 1
+    inc word [player1_laps]     ; sumar 1 vuelta
+    mov byte [checkpoint2_passed], 0  ; reset para la próxima vuelta
+
+.set_in_checkpoint:
+    mov byte [in_checkpoint], 1  ; marcar que estás en checkpoint1
+    jmp .done
+
+;-----------------------------------------
+; 2) Revisar si el jugador está en checkpoint2
+;-----------------------------------------
+.check_checkpoint2:
+    mov ax, [player_x]
+    cmp ax, [checkpoint2_x1]
+    jl .not_in_checkpoint
+    cmp ax, [checkpoint2_x2]
+    jg .not_in_checkpoint
+
+    mov ax, [player_y]
+    cmp ax, [checkpoint2_y1]
+    jl .not_in_checkpoint
+    cmp ax, [checkpoint2_y2]
+    jg .not_in_checkpoint
+
+    ; => El jugador SÍ está dentro de las coords del Checkpoint2
+    cmp byte [in_checkpoint], 1
+    jne .done                  ; si no venías del checkpoint1, no hacemos nada
+
+    ; aquí es que in_checkpoint=1 => venías del checkpoint1
+    mov byte [checkpoint2_passed], 1
+    mov byte [in_checkpoint], 0  ; sales de checkpoint1
+
+    jmp .done
+
+.not_in_checkpoint:
+    ; El jugador no está en ningún checkpoint, no hacemos nada especial
+
+.done:
+    popa
     ret
 
 
@@ -686,6 +1263,27 @@ old_bot_x      dw 100
 old_bot_y      dw 55
 bot_direction  db 1  ; 1=Derecha, 2=Abajo, 3=Izquierda, 4=Arriba
 
+
+; Bot 2
+bot2_x          dw 80    ; Posición inicial en X
+bot2_y          dw 50     ; Posición inicial en Y (un poco más abajo que el primer bot)
+bot2_color      db 14      ; Marrón
+bot2_width      dw 10     
+bot2_height     dw 10     
+old_bot2_x      dw 100
+old_bot2_y      dw 70
+bot2_direction  db 1      ; Dirección inicial: derecha
+
+; Bot 3
+bot3_x          dw 80    ; Posición inicial en X
+bot3_y          dw 30     ; Posición inicial en Y (un poco más abajo que el segundo bot)
+bot3_color      db 5      ; Magenta
+bot3_width      dw 10     
+bot3_height     dw 10     
+old_bot3_x      dw 100
+old_bot3_y      dw 85
+bot3_direction  db 1      ; Dirección inicial: derecha
+
 ; Para la rutina de colisión
 x_off           dw 0
 y_off           dw 0
@@ -697,13 +1295,13 @@ time_seconds    dw 60     ; Segundos restantes
 time_str        db 'Time: 60', 0
 
 ; Puntos de cambio de dirección para el bot
-waypoint_range dw 5      ; Rango de tolerancia en píxeles
+waypoint_range dw 20      ; Rango de tolerancia en píxeles
 
-waypoint1_x    dw 580    ; Primer punto X
-waypoint1_y    dw 55     ; Primer punto Y
+waypoint1_x    dw 600    ; Primer punto X
+waypoint1_y    dw 40     ; Primer punto Y
 waypoint1_dir  db 2      ; Nueva dirección (2=Abajo)
 
-waypoint2_x    dw 580    ; Segundo punto X
+waypoint2_x    dw 600    ; Segundo punto X
 waypoint2_y    dw 250    ; Segundo punto Y
 waypoint2_dir  db 3      ; Nueva dirección (3=Izquierda)
 
@@ -712,7 +1310,34 @@ waypoint3_y    dw 250    ; Tercer punto Y
 waypoint3_dir  db 4      ; Nueva dirección (4=Arriba)
 
 waypoint4_x    dw 30    ; Cuarto punto X
-waypoint4_y    dw 55     ; Cuarto punto Y
+waypoint4_y    dw 40     ; Cuarto punto Y
 waypoint4_dir  db 1      ; Nueva dirección (1=Derecha)
+
+; Variables para velocidades de los bots
+bot_speed       dw 5      ; Velocidad inicial (será reemplazada por valor aleatorio)
+bot2_speed      dw 5      ; Velocidad inicial (será reemplazada por valor aleatorio)
+bot3_speed      dw 5      ; Velocidad inicial (será reemplazada por valor aleatorio)
+random_seed     dw 0      ; Semilla para generación de números aleatorios
+
+
+; Variable temporal para cálculos
+random_range_temp dw 0
+
+
+; Contadores de vueltas
+player1_laps     dw 0      ; Vueltas del jugador 1
+player1_lap_str  db 'P1 Laps: 00', 0  ; Cadena para mostrar
+checkpoint_x1    dw 10    ; X mínima del punto de control
+checkpoint_x2    dw 100    ; X máxima del punto de control
+checkpoint_y1    dw 10     ; Y mínima del punto de control
+checkpoint_y2    dw 130     ; Y máxima del punto de control
+in_checkpoint    db 0      ; Flag para indicar si ya está en el checkpoint
+
+checkpoint2_x1    dw 550    ; X min of the second checkpoint
+checkpoint2_x2    dw 600    ; X max of the second checkpoint
+checkpoint2_y1    dw 200    ; Y min of the second checkpoint
+checkpoint2_y2    dw 300    ; Y max of the second checkpoint
+checkpoint2_passed db 0     ; Flag to indicate if checkpoint2 has been passed
+
 ; Observa que aquí ya no utilizamos "TIMES 510 - ($-$$) db 0" ni "dw 0xAA55"
 ; porque esto NO es un boot sector.
