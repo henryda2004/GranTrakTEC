@@ -8,43 +8,44 @@
 ; -----------------------------------------------------
 
 inicio:
-    ; Asegurar que DS apunta a la sección correcta
+    ; Configurar segmento de datos
     mov ax, 0x1000
-    mov ds, ax
+    mov ds, ax ; DS = 0x1000 para acceder a variables
 
-    ; Cambiar a modo gráfico 0x12 (640x480, 16 colores)
+    ; Iniciar modo gráfico 640x480, 16 colores
     mov ax, 0x12
     int 0x10
 
-    ; 1) Inicializamos la semilla
+    ; Inicializar sistema aleatorio
     call init_random_seed
 
-    ; 2) Asignamos velocidades aleatorias a cada bot en el rango 5..20
+    ; Asignar velocidades aleatorias a bots (5-20)
     mov bx, 5
     mov cx, 15
-    call random_range
+    call random_range ; Velocidad Bot1
     mov [bot_speed], ax
 
     mov bx, 5
     mov cx, 15
-    call random_range
+    call random_range ; Velocidad Bot2
     mov [bot2_speed], ax
 
     mov bx, 5
     mov cx, 15
-    call random_range
+    call random_range ; Velocidad Bot3
     mov [bot3_speed], ax
-    ; Inicializar temporizador (obtener ticks iniciales)
+    
+    ; Configurar temporizador inicial
     mov ah, 0x00
     int 0x1A
-    mov [time_start], dx  ; Guardar ticks iniciales (CX:DX)
+    mov [time_start], dx  
     
     ; Dibujar elementos iniciales
-    call draw_track
-    call update_timer  ; Mostrar tiempo inicial
-    call update_lap_counter  ; Mostrar contador inicial
+    call draw_track ; Pista blanca
+    call update_timer  ; Mostrar tiempo
+    call update_lap_counter  ; Mostrar contador 
 
-    ; 7) Verificar si completó una vuelta
+    ; Verificar si completó una vuelta
     call check_player1_lap
     
     call check_player2_lap
@@ -75,7 +76,7 @@ inicio:
     mov di, [player2_height] 
     call draw_rectangle
 
-    ; BOT (dibujarlo aquí para que aparezca de inmediato)
+    ; BOT 1 (AZUL)
     mov al, [bot_color]
     mov cx, [bot_x]
     mov dx, [bot_y]
@@ -83,7 +84,7 @@ inicio:
     mov di, [bot_height]
     call draw_rectangle
 
-    ; BOT 2 
+    ; BOT 2 (AMARILLO)
     mov al, [bot2_color]
     mov cx, [bot2_x]
     mov dx, [bot2_y]
@@ -91,7 +92,7 @@ inicio:
     mov di, [bot2_height]
     call draw_rectangle
 
-    ; BOT 3
+    ; BOT 3 (MORADO)
     mov al, [bot3_color]
     mov cx, [bot3_x]
     mov dx, [bot3_y]
@@ -269,6 +270,10 @@ read_key:
 ; ===============================
 ; SUBRUTINA: ACTUALIZAR POSICIÓN
 ; ===============================
+
+; update_position: Maneja entrada de teclado para movimientos
+; Usa scancodes de flechas (jugador1) y WASD (jugador2)
+; Limita movimiento dentro de bordes de pantalla
 update_position:
     ; Jugador 1: flechas
     cmp ah, 0x48  ; Flecha ↑
