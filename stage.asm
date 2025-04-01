@@ -1,29 +1,39 @@
-[bits 16]
-[org 0x0000]
+; =============================================================================
+; SEGUNDA ETAPA (STAGE 2) - JUEGO DE CARRERAS
+; =============================================================================
+; Este código implementa un juego de carreras con 2 jugadores humanos y 3 bots
+; controlados por la computadora. Se carga en la dirección 0x1000:0 por el
+; bootloader (primera etapa).
+; =============================================================================
+[bits 16]       ; Indicamos que usamos modo real de 16 bits
+[org 0x0000]    ; Código se cargará en el offset 0 del segmento 0x1000
 
-; -----------------------------------------------------
+; =============================================================================
+; INICIALIZACIÓN DEL JUEGO
+; =============================================================================
 ; Stage 2 se carga en 0x1000:0 por boot1.
-; Al saltar aquí, CS=??? (pero normalmente 0x1000),
-; DS=0, ES=0 (puedes ajustar según necesites).
-; -----------------------------------------------------
-
+; Al saltar aquí, CS=0x1000 (normalmente), DS=0, ES=0
+; =============================================================================
 inicio:
-    ; Configurar segmento de datos
+    ; Configurar segmento de datos para acceso a variables
     mov ax, 0x1000
     mov ds, ax ; DS = 0x1000 para acceder a variables
 
-    ; Iniciar modo gráfico 640x480, 16 colores
+    ; Iniciar modo gráfico 640x480, 16 colores (modo VGA 12h)
     mov ax, 0x12
     int 0x10
 
-    ; Inicializar sistema aleatorio
+    ; =============================================================================
+    ; INICIALIZACIÓN DEL SISTEMA ALEATORIO Y VELOCIDADES
+    ; =============================================================================
+    ; Inicializar sistema aleatorio basado en ticks del sistema
     call init_random_seed
 
     ; Asignar velocidades aleatorias a bots (5-20)
-    mov bx, 5
-    mov cx, 15
-    call random_range ; Velocidad Bot1
-    mov [bot_speed], ax
+    mov bx, 5   ; Valor mínimo de velocidad
+    mov cx, 15  ; Valor máximo de velocidad
+    call random_range ; Genera número aleatorio entre 5-15
+    mov [bot_speed], ax ; Guarda velocidad para Bot1
 
     mov bx, 5
     mov cx, 15
@@ -35,17 +45,23 @@ inicio:
     call random_range ; Velocidad Bot3
     mov [bot3_speed], ax
     
-    ; Configurar temporizador inicial
+    ; =============================================================================
+    ; CONFIGURACIÓN DEL TEMPORIZADOR
+    ; =============================================================================
+    ; Obtener tiempo inicial del sistema
     mov ah, 0x00
-    int 0x1A
-    mov [time_start], dx  
+    int 0x1A        ; Interrupción BIOS para hora del sistema
+    mov [time_start], dx  ; Guarda tiempo inicial (ticks)
     
-    ; Dibujar elementos iniciales
-    call draw_track ; Pista blanca
-    call update_timer  ; Mostrar tiempo
-    call update_lap_counter  ; Mostrar contador 
+    ; =============================================================================
+    ; DIBUJO INICIAL DE ELEMENTOS
+    ; =============================================================================
+    ; Dibujar pista y elementos de la UI
+    call draw_track ; Dibuja pista en color blanco
+    call update_timer  ; Muestra el temporizador en pantalla
+    call update_lap_counter  ; Muestra contador de vueltas
 
-    ; Verificar si completó una vuelta
+    ; Verificar si algún jugador ha completado vueltas (inicialmente 0)
     call check_player1_lap
     
     call check_player2_lap
@@ -60,6 +76,9 @@ inicio:
     call check_bot3_lap
     call update_lap_counter_bot3
 
+    ; =============================================================================
+    ; DIBUJADO INICIAL DE JUGADORES Y BOTS
+    ; =============================================================================
     ; ---- Jugador 1 (VERDE) ----
     mov al, [player_color]  ; Color
     mov cx, [player_x]      ; X
@@ -76,7 +95,7 @@ inicio:
     mov di, [player2_height] 
     call draw_rectangle
 
-    ; BOT 1 (AZUL)
+    ; ---- BOT 1 (AZUL) ----
     mov al, [bot_color]
     mov cx, [bot_x]
     mov dx, [bot_y]
@@ -84,7 +103,7 @@ inicio:
     mov di, [bot_height]
     call draw_rectangle
 
-    ; BOT 2 (AMARILLO)
+    ; ---- BOT 2 (AMARILLO) ----
     mov al, [bot2_color]
     mov cx, [bot2_x]
     mov dx, [bot2_y]
@@ -92,7 +111,7 @@ inicio:
     mov di, [bot2_height]
     call draw_rectangle
 
-    ; BOT 3 (MORADO)
+    ; ---- BOT 3 (MORADO) ----
     mov al, [bot3_color]
     mov cx, [bot3_x]
     mov dx, [bot3_y]
@@ -100,150 +119,158 @@ inicio:
     mov di, [bot3_height]
     call draw_rectangle
 
-
+; =============================================================================
+; BUCLE PRINCIPAL DEL JUEGO
+; =============================================================================
 main_loop:
-    ; 1) Guardar las posiciones actuales (para borrarlas luego)
+    ; 1) Guardar las posiciones actuales para borrar luego
     mov ax, [player_x]
-    mov [old_x], ax
+    mov [old_x], ax         ; Guarda posición X del jugador 1
     mov ax, [player_y]
-    mov [old_y], ax
+    mov [old_y], ax         ; Guarda posición Y del jugador 1
 
     mov ax, [player2_x]
-    mov [old2_x], ax
+    mov [old2_x], ax        ; Guarda posición X del jugador 2
     mov ax, [player2_y]
-    mov [old2_y], ax
+    mov [old2_y], ax        ; Guarda posición Y del jugador 2
 
-    ; 2) Leer tecla
-    call read_key  ; AH=scancode, AL=ASCII
+    ; 2) Leer entrada de teclado
+    call read_key           ; Obtiene tecla presionada (AH=scancode, AL=ASCII)
 
-    ; 3) Actualizar posiciones de los jugadores
-    call update_position
+    ; 3) Actualizar posiciones de los jugadores según tecla
+    call update_position    ; Mueve jugadores según tecla presionada
 
-    ; 3b) Comprobar colisión del jugador 1 (verde) con la pista blanca
-    call check_collision_player1
+    ; 3b) Comprobar colisiones con la pista
+    call check_collision_player1  ; Verifica colisión del jugador 1
+    call check_collision_player2  ; Verifica colisión del jugador 2
 
-    ; 3c) Comprobar colisión del jugador 2 (rojo) con la pista blanca
-    call check_collision_player2
-    
-    ; 4) Borrar los rectángulos anteriores
+    ; 4) Borrar los rectángulos de posiciones anteriores
     ; -- Jugador 1 --
-    mov al, 0
-    mov cx, [old_x]
-    mov dx, [old_y]
-    mov si, [player_width]
-    mov di, [player_height]
-    call draw_rectangle
+    mov al, 0               ; Color 0 = negro (borra)
+    mov cx, [old_x]         ; Posición X antigua
+    mov dx, [old_y]         ; Posición Y antigua
+    mov si, [player_width]  ; Mismo ancho
+    mov di, [player_height] ; Mismo alto
+    call draw_rectangle     ; Borra dibujando rectángulo negro
 
     ; -- Jugador 2 --
-    mov al, 0
-    mov cx, [old2_x]
-    mov dx, [old2_y]
-    mov si, [player2_width]
-    mov di, [player2_height]
-    call draw_rectangle
+    mov al, 0               ; Color 0 = negro (borra)
+    mov cx, [old2_x]        ; Posición X antigua
+    mov dx, [old2_y]        ; Posición Y antigua
+    mov si, [player2_width] ; Mismo ancho
+    mov di, [player2_height]; Mismo alto
+    call draw_rectangle     ; Borra dibujando rectángulo negro
 
-    ; 5) Dibujar los rectángulos en la nueva posición
+    ; 5) Dibujar jugadores en las nuevas posiciones
     ; -- Jugador 1 --
-    mov al, [player_color]
-    mov cx, [player_x]
-    mov dx, [player_y]
-    mov si, [player_width]
-    mov di, [player_height]
-    call draw_rectangle
+    mov al, [player_color]  ; Color original
+    mov cx, [player_x]      ; Nueva posición X
+    mov dx, [player_y]      ; Nueva posición Y
+    mov si, [player_width]  ; Ancho
+    mov di, [player_height] ; Alto
+    call draw_rectangle     ; Dibuja en nueva posición
 
     ; -- Jugador 2 --
-    mov al, [player2_color]
-    mov cx, [player2_x]
-    mov dx, [player2_y]
-    mov si, [player2_width]
-    mov di, [player2_height]
-    call draw_rectangle
+    mov al, [player2_color] ; Color original
+    mov cx, [player2_x]     ; Nueva posición X
+    mov dx, [player2_y]     ; Nueva posición Y
+    mov si, [player2_width] ; Ancho
+    mov di, [player2_height]; Alto
+    call draw_rectangle     ; Dibuja en nueva posición
 
-    ; === BOT ===
-    ; 1) Guardar pos anterior
+    ; =============================================================================
+    ; ACTUALIZACIÓN DE BOT 1
+    ; =============================================================================
+    ; 1) Guardar posición anterior
     mov ax, [bot_x]
-    mov [old_bot_x], ax
+    mov [old_bot_x], ax     ; Guarda posición X antigua
     mov ax, [bot_y]
-    mov [old_bot_y], ax
+    mov [old_bot_y], ax     ; Guarda posición Y antigua
 
-    ; 2) Mover bot
-    call move_bot
+    ; 2) Mover bot según su lógica interna
+    call move_bot           ; Actualiza posición del bot 1
 
-    ; 3) Borrar bot anterior
-    mov al, 0
-    mov cx, [old_bot_x]
-    mov dx, [old_bot_y]
-    mov si, [bot_width]
-    mov di, [bot_height]
-    call draw_rectangle
+    ; 3) Borrar bot de posición anterior
+    mov al, 0               ; Color 0 = negro (borra)
+    mov cx, [old_bot_x]     ; Posición X antigua
+    mov dx, [old_bot_y]     ; Posición Y antigua
+    mov si, [bot_width]     ; Ancho
+    mov di, [bot_height]    ; Alto
+    call draw_rectangle     ; Borra dibujando rectángulo negro
 
     ; 4) Dibujar bot en nueva posición
-    mov al, [bot_color]
-    mov cx, [bot_x]
-    mov dx, [bot_y]
-    mov si, [bot_width]
-    mov di, [bot_height]
-    call draw_rectangle
+    mov al, [bot_color]     ; Color original
+    mov cx, [bot_x]         ; Nueva posición X
+    mov dx, [bot_y]         ; Nueva posición Y
+    mov si, [bot_width]     ; Ancho
+    mov di, [bot_height]    ; Alto
+    call draw_rectangle     ; Dibuja en nueva posición
 
-    ; === BOT 2 ===
-    ; 1) Guardar pos anterior
+    ; =============================================================================
+    ; ACTUALIZACIÓN DE BOT 2
+    ; =============================================================================
+    ; 1) Guardar posición anterior
     mov ax, [bot2_x]
-    mov [old_bot2_x], ax
+    mov [old_bot2_x], ax    ; Guarda posición X antigua
     mov ax, [bot2_y]
-    mov [old_bot2_y], ax
+    mov [old_bot2_y], ax    ; Guarda posición Y antigua
 
     ; 2) Mover bot 2
-    call move_bot2
+    call move_bot2          ; Actualiza posición del bot 2
 
-    ; 3) Borrar bot anterior
-    mov al, 0
-    mov cx, [old_bot2_x]
-    mov dx, [old_bot2_y]
-    mov si, [bot2_width]
-    mov di, [bot2_height]
-    call draw_rectangle
+    ; 3) Borrar bot de posición anterior
+    mov al, 0               ; Color 0 = negro (borra)
+    mov cx, [old_bot2_x]    ; Posición X antigua
+    mov dx, [old_bot2_y]    ; Posición Y antigua
+    mov si, [bot2_width]    ; Ancho
+    mov di, [bot2_height]   ; Alto
+    call draw_rectangle     ; Borra dibujando rectángulo negro
 
     ; 4) Dibujar bot en nueva posición
-    mov al, [bot2_color]
-    mov cx, [bot2_x]
-    mov dx, [bot2_y]
-    mov si, [bot2_width]
-    mov di, [bot2_height]
-    call draw_rectangle
+    mov al, [bot2_color]    ; Color original
+    mov cx, [bot2_x]        ; Nueva posición X
+    mov dx, [bot2_y]        ; Nueva posición Y
+    mov si, [bot2_width]    ; Ancho
+    mov di, [bot2_height]   ; Alto
+    call draw_rectangle     ; Dibuja en nueva posición
 
-    ; === BOT 3 ===
-    ; 1) Guardar pos anterior
+    ; =============================================================================
+    ; ACTUALIZACIÓN DE BOT 3
+    ; =============================================================================
+    ; 1) Guardar posición anterior
     mov ax, [bot3_x]
-    mov [old_bot3_x], ax
+    mov [old_bot3_x], ax    ; Guarda posición X antigua
     mov ax, [bot3_y]
-    mov [old_bot3_y], ax
+    mov [old_bot3_y], ax    ; Guarda posición Y antigua
 
     ; 2) Mover bot 3
-    call move_bot3
+    call move_bot3          ; Actualiza posición del bot 3
 
-    ; 3) Borrar bot anterior
-    mov al, 0
-    mov cx, [old_bot3_x]
-    mov dx, [old_bot3_y]
-    mov si, [bot3_width]
-    mov di, [bot3_height]
-    call draw_rectangle
+    ; 3) Borrar bot de posición anterior
+    mov al, 0               ; Color 0 = negro (borra)
+    mov cx, [old_bot3_x]    ; Posición X antigua
+    mov dx, [old_bot3_y]    ; Posición Y antigua
+    mov si, [bot3_width]    ; Ancho
+    mov di, [bot3_height]   ; Alto
+    call draw_rectangle     ; Borra dibujando rectángulo negro
 
     ; 4) Dibujar bot en nueva posición
-    mov al, [bot3_color]
-    mov cx, [bot3_x]
-    mov dx, [bot3_y]
-    mov si, [bot3_width]
-    mov di, [bot3_height]
-    call draw_rectangle
+    mov al, [bot3_color]    ; Color original
+    mov cx, [bot3_x]        ; Nueva posición X
+    mov dx, [bot3_y]        ; Nueva posición Y
+    mov si, [bot3_width]    ; Ancho
+    mov di, [bot3_height]   ; Alto
+    call draw_rectangle     ; Dibuja en nueva posición
 
-    ; -- Aquí invocas la comprobación de vuelta --
+    ; =============================================================================
+    ; VERIFICACIÓN DE VUELTAS
+    ; =============================================================================
+    ; Comprobar vueltas para todos los participantes
     call check_player1_lap
     call update_lap_counter
     call check_player2_lap
     call update_lap_counter_p2
 
-    ; Verificar vueltas de los bots
     call check_bot1_lap
     call update_lap_counter_bot1
 
@@ -253,9 +280,10 @@ main_loop:
     call check_bot3_lap
     call update_lap_counter_bot3
 
-    ; 6) Actualizar temporizador
-    call update_timer
+    ; 6) Actualizar temporizador del juego
+    call update_timer       ; Actualiza y muestra el tiempo restante
 
+    ; Volver al inicio del bucle principal
     jmp main_loop
 
 
