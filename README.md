@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-# GranTrakTEC
-=======
 # Gran Trak TEC - Juego de Carreras en Ensamblador x86 
 
 Este proyecto implementa un sencillo juego de carreras multijugador escrito en lenguaje ensamblador x86, diseñado para ejecutarse directamente sobre el hardware sin necesidad de un sistema operativo. El juego incluye dos jugadores controlados por humanos y tres bots controlados por el CPU con rutas aleatorias
@@ -8,6 +5,14 @@ Este proyecto implementa un sencillo juego de carreras multijugador escrito en l
 ## Descripción del Juego
 
 El juego consiste en una carrera de 60 segundos donde los jugadores deben completar la mayor cantidad posible de vueltas en una pista. Al finalizar el tiempo, se determina el ganador basado en el número de vueltas completadas.
+
+<p align="center">
+  <a href="https://github.com/henryda2004/GranTrakTEC/blob/main/Figuras/gameSet.png" target="blank"><img src="Figuras/gameSet.png" width="400" alt="Game set" /></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/henryda2004/GranTrakTEC/blob/main/Figuras/gameWinners.png" target="blank"><img src="Figuras/gameWinners.png" width="400" alt="Game set" /></a>
+</p>
 
 ### Características
 
