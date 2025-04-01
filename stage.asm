@@ -1033,15 +1033,12 @@ draw_track:
 
     ret
 
-
-; ===============================
-; SUBRUTINA: COMPROBAR COLISIÓN 
-; (Sólo Jugador 1 - verde)
-; ===============================
-; Si en el área del jugador hay al menos un píxel
-; de color 15 (blanco), se asume colisión y se
-; regresa al punto de partida (x=100, y=20).
-; ===============================
+; =============================================================================
+; SUBRUTINA: COMPROBAR COLISIÓN (JUGADOR 1)
+; =============================================================================
+; Verifica si el jugador 1 (verde) ha colisionado con la pista (color blanco)
+; Si hay colisión, devuelve al jugador a su posición inicial
+; =============================================================================
 check_collision_player1:
     push ax
     push bx
@@ -1050,45 +1047,44 @@ check_collision_player1:
     push si
     push di
 
-    ; Variables de apoyo en memoria
+    ; Variables de apoyo para escanear el área del jugador
     xor ax, ax
-    mov [x_off], ax       ; x_off = 0
+    mov [x_off], ax       ; x_off = 0 (desplazamiento X)
 outer_x_loop:
     xor ax, ax
-    mov [y_off], ax       ; y_off = 0
+    mov [y_off], ax       ; y_off = 0 (desplazamiento Y)
 
 outer_y_loop:
     ; Leer color del píxel en (player_x + x_off, player_y + y_off)
-    mov ah, 0x0D          ; Función Read Pixel
-    xor bh, bh            ; Página 0
+    mov ah, 0x0D             ; Función BIOS: Leer Pixel
+    xor bh, bh               ; Página 0
     mov cx, [player_x]
-    add cx, [x_off]
+    add cx, [x_off]          ; CX = X + desplazamiento
     mov dx, [player_y]
-    add dx, [y_off]
-    int 0x10              ; AL = color del pixel
+    add dx, [y_off]          ; DX = Y + desplazamiento
+    int 0x10                 ; AL = color del pixel leído
 
-    cmp al, 15            ; ¿Es blanco?
-    je collision_detected  ; Sí -> colisión
+    cmp al, 15               ; ¿Es blanco? (color de la pista)
+    je collision_detected    ; Sí -> colisión detectada
 
-    ; Incrementar y_off
+    ; Incrementar y_off (siguiente pixel en Y)
     inc word [y_off]
     mov ax, [y_off]
-    cmp ax, [player_height]
+    cmp ax, [player_height]  ; ¿Hemos recorrido todo el alto?
+    jl outer_y_loop          ; Si no, continuar escaneando Y
 
-    jl outer_y_loop       ; mientras y_off < player_height
-
-    ; Pasar a siguiente x_off
+    ; Pasar a siguiente x_off (siguiente columna)
     inc word [x_off]
     mov ax, [x_off]
-    cmp ax, [player_width]
-    jl outer_x_loop       ; mientras x_off < player_width
+    cmp ax, [player_width]   ; ¿Hemos recorrido todo el ancho?
+    jl outer_x_loop          ; Si no, continuar escaneando X
 
-    jmp no_collision
+    jmp no_collision ; No se encontró colisión
 
 collision_detected:
-    ; Restaurar posición (punto de partida)
-    mov word [player_x], 110
-    mov word [player_y], 20
+    ; Restaurar posición a punto de partida si hay colisión
+    mov word [player_x], 110 ; Posición X inicial
+    mov word [player_y], 20  ; Posición Y inicial
 
 no_collision:
     pop di
@@ -1099,11 +1095,11 @@ no_collision:
     pop ax
     ret
 
-
-; ===============================
-; SUBRUTINA: COMPROBAR COLISIÓN
-; (Sólo Jugador 2 - rojo)
-; ===============================
+; =============================================================================
+; SUBRUTINA: COMPROBAR COLISIÓN (JUGADOR 2)
+; =============================================================================
+; Similar a la anterior pero para el jugador 2 (rojo)
+; =============================================================================
 check_collision_player2:
     push ax
     push bx
@@ -1129,22 +1125,22 @@ outer_y_loop_2:
     add dx, [y_off]
     int 0x10              ; AL = color del pixel
 
-    cmp al, 15            ; ¿Es blanco?
+    cmp al, 15            ; ¿Es blanco? (color de la pista)
     je collision_detected_2  ; Sí -> colisión
 
     ; Incrementar y_off
     inc word [y_off]
     mov ax, [y_off]
     cmp ax, [player2_height]
-    jl outer_y_loop_2       ; mientras y_off < player2_height
+    jl outer_y_loop_2       ; Continuar si y_off < player2_height
 
     ; Pasar a siguiente x_off
     inc word [x_off]
     mov ax, [x_off]
     cmp ax, [player2_width]
-    jl outer_x_loop_2       ; mientras x_off < player2_width
+    jl outer_x_loop_2       ; Continuar si x_off < player2_width
 
-    jmp no_collision_2
+    jmp no_collision_2 ; No hubo colisión
 
 collision_detected_2:
     ; Restaurar posición inicial del Jugador 2 (rojo)
@@ -1160,21 +1156,21 @@ no_collision_2:
     pop ax
     ret
 
-
-; ========================================
+; =============================================================================
 ; SUBRUTINA: INIT_RANDOM_SEED
-;  - Inicializa la semilla con los ticks del BIOS
-; ========================================
+; =============================================================================
+; Inicializa la semilla del generador de números aleatorios
+; usando los ticks del reloj del sistema BIOS
+; =============================================================================
 init_random_seed:
     push ax
     push dx
     
-    mov ah, 0x00   ; Función 0 de int 1Ah -> get system time
-    int 0x1A
-    ; DX contiene los ticks (parte baja)
-    mov [random_seed], dx
+    mov ah, 0x00             ; Función 0 de INT 1Ah: obtener tiempo del sistema
+    int 0x1A                 ; DX contiene los ticks (parte baja)
+    mov [random_seed], dx    ; Guardar ticks como semilla
     
-    ; Asegurarse que la semilla nunca sea 0
+    ; Asegurarse que la semilla nunca sea 0 (causaría problemas en el generador)
     cmp word [random_seed], 0
     jne .seed_ok
     mov word [random_seed], 1234  ; Valor alternativo si es 0
@@ -1184,15 +1180,15 @@ init_random_seed:
     pop ax
     ret
 
-
-; ========================================
+; =============================================================================
 ; SUBRUTINA: RANDOM_LCG
-;  - Generador pseudoaleatorio (lineal congruencial)
-;  - Devuelve en AX el nuevo valor pseudoaleatorio
-;    (y lo deja guardado en random_seed).
-; ========================================
+; =============================================================================
+; Generador pseudoaleatorio (usando método lineal congruencial - LCG)
+; Devuelve en AX el nuevo valor pseudoaleatorio
+; También actualiza la semilla en memoria
+; Fórmula: semilla = (semilla * A + C) mod 65536
+; =============================================================================
 random_lcg:
-    ; Formula típica: seed = (seed * A + C) mod 65536
     push bx
     push cx
     push dx
@@ -1203,12 +1199,12 @@ random_lcg:
     mov word [random_seed], 1234  ; Valor alternativo si es 0
     
 .seed_not_zero:
-    mov ax, [random_seed]
-    mov cx, 25173         ; Valor A: 25173 (0x6253)
-    mul cx                ; DX:AX = AX * CX
-    add ax, 13849         ; Valor C: 13849 (0x3619)
-    ; (mod 65536) es automático en 16 bits
-    mov [random_seed], ax
+    mov ax, [random_seed]    ; Cargar semilla actual
+    mov cx, 25173            ; Multiplicador A: 25173 (0x6253)
+    mul cx                   ; DX:AX = AX * CX
+    add ax, 13849            ; Constante C: 13849 (0x3619)
+    ; (mod 65536) es automático en 16 bits (overflow natural)
+    mov [random_seed], ax    ; Guardar nueva semilla
     
     pop dx
     pop cx
@@ -1216,28 +1212,33 @@ random_lcg:
     ret
 
 
-; ========================================
+; =============================================================================
 ; SUBRUTINA: RANDOM_RANGE
-;  - Genera un número en el rango [BX, CX]
-;  - Devuelve en AX el número.
-;  - Ejemplo de uso:
-;       mov bx, 5   ; Mínimo
-;       mov cx, 20  ; Máximo
-;       call random_range
-;       ; AX = valor en [5..20]
-; ========================================
+; =============================================================================
+; Genera un número aleatorio en el rango [BX, CX]
+; Entrada:
+;   - BX: valor mínimo
+;   - CX: valor máximo
+; Salida:
+;   - AX: valor aleatorio en el rango especificado
+; Ejemplo: 
+;   mov bx, 5   ; Mínimo = 5
+;   mov cx, 20  ; Máximo = 20
+;   call random_range
+;   ; AX contendrá un valor entre 5 y 20
+; =============================================================================
 random_range:
     push dx
     push bx
     push cx
 
-    ; 1) Llamamos a random_lcg para obtener un pseudoaleatorio en AX
+    ; 1) Llamar a random_lcg para obtener un número pseudoaleatorio base
     call random_lcg
 
-    ; 2) Guardar los valores min/max
-    mov dx, cx      ; DX = max
-    sub dx, bx      ; DX = max - min
-    inc dx          ; DX = max - min + 1 (rango)
+    ; 2) Guardar los valores min/max y calcular rango
+    mov dx, cx              ; DX = máximo
+    sub dx, bx              ; DX = máximo - mínimo
+    inc dx                  ; DX = máximo - mínimo + 1 (tamaño del rango)
 
     ; Si el rango es 0, devolver el mínimo
     cmp dx, 0
@@ -1246,15 +1247,15 @@ random_range:
     jmp .done
 
 .continue:
-    ; 3) AX = AX mod rango
-    xor cx, cx      ; Limpiar CX para la división
+    ; 3) AX = AX mod rango (para limitar al tamaño del rango)
+    xor cx, cx      ; Limpiar CX para división
     push dx         ; Guardar el rango
     xor dx, dx      ; Limpiar DX para la división
     
     pop cx          ; CX = rango
     div cx          ; AX = AX / CX, DX = AX mod CX
     
-    mov ax, dx      ; AX = AX mod rango
+    mov ax, dx      ; AX = AX mod rango (resto de la división)
 
     ; 4) Sumamos el mínimo
     add ax, bx      ; AX = (AX mod rango) + min
@@ -1265,17 +1266,18 @@ random_range:
     pop dx
     ret
 
-
-; ===============================
+; =============================================================================
 ; SUBRUTINA: ACTUALIZAR CONTADOR DE VUELTAS
-; ===============================
+; =============================================================================
+; Actualiza y muestra en pantalla el contador de vueltas del jugador 1
+; =============================================================================
 update_lap_counter:
     pusha
     
     ; Actualizar la cadena con el número actual de vueltas
     mov di, player1_lap_str + 9  ; Posición del número en "P1 Laps: 00"
     mov ax, [player1_laps]
-    call word_to_ascii
+    call word_to_ascii             ; Convertir número a ASCII
     
     ; Dibujar el contador en (0,1) - justo debajo del tiempo
     mov ah, 0x13        ; Función BIOS: Escribir cadena
@@ -1283,21 +1285,22 @@ update_lap_counter:
     mov bh, 0x00        ; Página 0
     mov bl, 0x0F        ; Color blanco sobre negro
     mov cx, 11          ; Longitud de la cadena
-    mov dh, 17           ; Fila 1 (debajo del tiempo)
-    mov dl, 13           ; Columna 0
-    mov bp, player1_lap_str
+    mov dh, 17           ; Fila 17
+    mov dl, 13           ; Columna 13
+    mov bp, player1_lap_str ;Dirección de la cadena
     int 0x10
     
     popa
     ret
 
-
-; ===============================
+; =============================================================================
 ; SUBRUTINA: VERIFICAR VUELTAS DEL JUGADOR 1
-; ===============================
-; Add a second checkpoint on the opposite side of the track
-; Modify the check_player1_lap routine to implement a two-checkpoint system
-
+; =============================================================================
+; Sistema de dos checkpoints para contar vueltas:
+; - Checkpoint1: parte superior de la pista
+; - Checkpoint2: parte inferior de la pista
+; Para completar una vuelta, debe pasar por ambos checkpoints en orden
+; =============================================================================
 check_player1_lap:
     pusha
     
@@ -1326,7 +1329,7 @@ check_player1_lap:
     mov byte [checkpoint2_passed], 0  ; reset para la próxima vuelta
 
 .set_in_checkpoint:
-    mov byte [in_checkpoint], 1  ; marcar que estás en checkpoint1
+    mov byte [in_checkpoint], 1  ; Marcar que está en checkpoint1
     jmp .done
 
 ;-----------------------------------------
@@ -1349,7 +1352,7 @@ check_player1_lap:
     cmp byte [in_checkpoint], 1
     jne .done                  ; si no venías del checkpoint1, no hacemos nada
 
-    ; aquí es que in_checkpoint=1 => venías del checkpoint1
+    ; Confirmamos que pasó por el checkpoint2 después del checkpoint1
     mov byte [checkpoint2_passed], 1
     mov byte [in_checkpoint], 0  ; sales de checkpoint1
 
@@ -1362,6 +1365,11 @@ check_player1_lap:
     popa
     ret
 
+; =============================================================================
+; SUBRUTINA: VERIFICAR VUELTAS DEL JUGADOR 2
+; =============================================================================
+; Similar al sistema de checkpoints del jugador 1, pero para el jugador 2
+; =============================================================================
 check_player2_lap:
     pusha
     
@@ -1410,7 +1418,7 @@ check_player2_lap:
 
     ; El jugador 2 SÍ está en el Checkpoint2
     cmp byte [in_checkpoint_p2], 1
-    jne .done
+    jne .done ; Si no venía del checkpoint1, ignorar
 
     ; Confirmar paso por Checkpoint2
     mov byte [checkpoint2_passed_p2], 1
@@ -1423,28 +1431,39 @@ check_player2_lap:
 .done:
     popa
     ret
+
+; =============================================================================
+; SUBRUTINA: ACTUALIZAR CONTADOR VUELTAS JUGADOR 2
+; =============================================================================
+; Actualiza y muestra el contador de vueltas del jugador 2
+; =============================================================================
 update_lap_counter_p2:
     pusha
     
     ; Actualizar la cadena con el número actual de vueltas
     mov di, player2_lap_str + 9  ; Posición del número en "P2 Laps: 00"
     mov ax, [player2_laps]
-    call word_to_ascii
+    call word_to_ascii          ; Convertir a ASCII
     
-    ; Dibujar el contador en (0,2) - Justo debajo del contador del Player 1
-    mov ah, 0x13        ; Función BIOS: Escribir cadena
-    mov al, 0x01        ; Modo de escritura (actualizar posición)
-    mov bh, 0x00        ; Página 0
-    mov bl, 0x0F        ; Color blanco sobre negro
-    mov cx, 11          ; Longitud de la cadena
-    mov dh, 17           ; Fila 2
-    mov dl, 26           ; Columna 0
-    mov bp, player2_lap_str
+    ; Dibujar el contador en pantalla
+    mov ah, 0x13                 ; Función BIOS: Escribir cadena
+    mov al, 0x01                 ; Modo de escritura (actualizar posición)
+    mov bh, 0x00                 ; Página 0
+    mov bl, 0x0F                 ; Color blanco sobre negro
+    mov cx, 11                   ; Longitud de la cadena
+    mov dh, 17                   ; Fila 17
+    mov dl, 26                   ; Columna 26
+    mov bp, player2_lap_str      ; Dirección de la cadena
     int 0x10
     
     popa
     ret
 
+; =============================================================================
+; SUBRUTINA: VERIFICAR VUELTAS DEL BOT 1
+; =============================================================================
+; Sistema de checkpoints similar a los jugadores pero para el Bot 1
+; =============================================================================
 check_bot1_lap:
     pusha
     
@@ -1501,6 +1520,12 @@ check_bot1_lap:
 .done:
     popa
     ret
+
+; =============================================================================
+; SUBRUTINA: ACTUALIZAR CONTADOR VUELTAS BOT 1
+; =============================================================================
+; Actualiza y muestra el contador de vueltas del Bot 1
+; =============================================================================
 update_lap_counter_bot1:
     pusha
     
@@ -1523,6 +1548,11 @@ update_lap_counter_bot1:
     popa
     ret
 
+; =============================================================================
+; SUBRUTINA: VERIFICAR VUELTAS DEL BOT 2
+; =============================================================================
+; Sistema de checkpoints similar a los anteriores pero para el Bot 2
+; =============================================================================
 check_bot2_lap:
     pusha
     
@@ -1579,6 +1609,12 @@ check_bot2_lap:
 .done:
     popa
     ret
+
+; =============================================================================
+; SUBRUTINA: ACTUALIZAR CONTADOR VUELTAS BOT 2
+; =============================================================================
+; Actualiza y muestra el contador de vueltas del Bot 2
+; =============================================================================
 update_lap_counter_bot2:
     pusha
     
@@ -1601,7 +1637,11 @@ update_lap_counter_bot2:
     popa
     ret
 
-
+; =============================================================================
+; SUBRUTINA: VERIFICAR VUELTAS DEL BOT 3
+; =============================================================================
+; Sistema de checkpoints similar a los anteriores pero para el Bot 3
+; =============================================================================
 check_bot3_lap:
     pusha
     
@@ -1610,25 +1650,26 @@ check_bot3_lap:
     ;-----------------------------------------
     mov ax, [bot3_x]
     cmp ax, [checkpoint_x1]
-    jl .check_checkpoint2
+    jl .check_checkpoint2 ; Si está fuera del rango X, verificar checkpoint2
     cmp ax, [checkpoint_x2]
-    jg .check_checkpoint2
+    jg .check_checkpoint2 ; Si está fuera del rango X, verificar checkpoint2
     
     mov ax, [bot3_y]
     cmp ax, [checkpoint_y1]
-    jl .check_checkpoint2
+    jl .check_checkpoint2   ; Si está fuera del rango Y, verificar checkpoint2
     cmp ax, [checkpoint_y2]
-    jg .check_checkpoint2
+    jg .check_checkpoint2 ; Si está fuera del rango Y, verificar checkpoint2
 
     ; Si pasó checkpoint2, sumar vuelta
     cmp byte [checkpoint2_passed_bot3], 1
-    jne .set_in_checkpoint
+    jne .set_in_checkpoint ; Si no ha pasado checkpoint2, solo marcar que está en checkpoint1
 
-    inc word [bot3_laps]
-    mov byte [checkpoint2_passed_bot3], 0
+    ; Completó una vuelta al pasar ambos checkpoints en orden
+    inc word [bot3_laps] ; Incrementar contador de vueltas
+    mov byte [checkpoint2_passed_bot3], 0 ; Resetear flag para siguiente vuelta
 
 .set_in_checkpoint:
-    mov byte [in_checkpoint_bot3], 1
+    mov byte [in_checkpoint_bot3], 1 ; Marcar que está en checkpoint1
     jmp .done
 
 ;-----------------------------------------
@@ -1637,44 +1678,51 @@ check_bot3_lap:
 .check_checkpoint2:
     mov ax, [bot3_x]
     cmp ax, [checkpoint2_x1]
-    jl .not_in_checkpoint
+    jl .not_in_checkpoint ; Si está fuera del rango X, no está en ningún checkpoint
     cmp ax, [checkpoint2_x2]
-    jg .not_in_checkpoint
+    jg .not_in_checkpoint ; Si está fuera del rango X, no está en ningún checkpoint
 
     mov ax, [bot3_y]
     cmp ax, [checkpoint2_y1]
-    jl .not_in_checkpoint
+    jl .not_in_checkpoint ; Si está fuera del rango Y, no está en ningún checkpoint
     cmp ax, [checkpoint2_y2]
-    jg .not_in_checkpoint
+    jg .not_in_checkpoint ; Si está fuera del rango Y, no está en ningún checkpoint
 
     ; Si estaba en checkpoint1, marcar checkpoint2 como pasado
     cmp byte [in_checkpoint_bot3], 1
-    jne .done
+    jne .done ; Si no venía de checkpoint1, ignorar
 
+    ; Marcar paso por checkpoint2 (requerido para contar vuelta)
     mov byte [checkpoint2_passed_bot3], 1
-    mov byte [in_checkpoint_bot3], 0
+    mov byte [in_checkpoint_bot3], 0 ; Resetear flag de checkpoint1
 
 .not_in_checkpoint:
 .done:
     popa
     ret
+
+; =============================================================================
+; SUBRUTINA: ACTUALIZAR CONTADOR VUELTAS BOT 3
+; =============================================================================
+; Actualiza y muestra el contador de vueltas del Bot 3
+; =============================================================================
 update_lap_counter_bot3:
     pusha
     
     ; Actualizar la cadena con el número actual de vueltas
     mov di, bot3_lap_str + 9  ; Posición del número en "Bot1 Laps: 00"
     mov ax, [bot3_laps]
-    call word_to_ascii
+    call word_to_ascii ; Convertir número a ASCII
     
-    ; Dibujar en pantalla (fila 3 para bot 1)
-    mov ah, 0x13
-    mov al, 0x01
-    mov bh, 0x00
-    mov bl, 0x0F
-    mov cx, 11
-    mov dh, 17
-    mov dl, 65
-    mov bp, bot3_lap_str
+    ; Dibujar en pantalla
+    mov ah, 0x13             ; Función BIOS: Escribir cadena
+    mov al, 0x01             ; Modo de escritura (actualizar posición)
+    mov bh, 0x00             ; Página 0
+    mov bl, 0x0F             ; Color blanco sobre negro
+    mov cx, 11               ; Longitud de la cadena
+    mov dh, 17               ; Fila 17
+    mov dl, 65               ; Columna 65
+    mov bp, bot3_lap_str     ; Dirección de la cadena
     int 0x10
     
     popa
