@@ -287,215 +287,246 @@ main_loop:
     jmp main_loop
 
 
-; ===============================
+; =============================================================================
 ; SUBRUTINA: LEER TECLA
-; ===============================
+; =============================================================================
+; Espera a que se presione una tecla y devuelve su scancode en AH
+; y el código ASCII en AL.
+; =============================================================================
 read_key:
-    mov ah, 0x00
-    int 0x16
+    mov ah, 0x00           ; Función 0 de INT 16h (leer tecla)
+    int 0x16               ; Interrupción de teclado BIOS
     ret
 
-; ===============================
+; =============================================================================
 ; SUBRUTINA: ACTUALIZAR POSICIÓN
-; ===============================
+; =============================================================================
+; Maneja entrada de teclado para mover a los jugadores
+; - Jugador 1: usa flechas para moverse (↑,↓,←,→)
+; - Jugador 2: usa teclas WASD (W=arriba, S=abajo, A=izquierda, D=derecha)
+; Incluye límites para evitar que salgan de la pantalla
+; =============================================================================
 
-; update_position: Maneja entrada de teclado para movimientos
-; Usa scancodes de flechas (jugador1) y WASD (jugador2)
-; Limita movimiento dentro de bordes de pantalla
 update_position:
+    ; Analiza qué tecla se presionó usando el scancode en AH
+
     ; Jugador 1: flechas
-    cmp ah, 0x48  ; Flecha ↑
+    cmp ah, 0x48           ; Flecha ↑ (scancode 0x48)
     je move_up_1
-    cmp ah, 0x50  ; Flecha ↓
+    cmp ah, 0x50           ; Flecha ↓ (scancode 0x50)
     je move_down_1
-    cmp ah, 0x4B  ; Flecha ←
+    cmp ah, 0x4B           ; Flecha ← (scancode 0x4B)
     je move_left_1
-    cmp ah, 0x4D  ; Flecha →
+    cmp ah, 0x4D           ; Flecha → (scancode 0x4D)
     je move_right_1
 
     ; Jugador 2: W, S, A, D
-    cmp ah, 0x11  ; W
+    cmp ah, 0x11           ; W (scancode 0x11)
     je move_up_2
-    cmp ah, 0x1F  ; S
+    cmp ah, 0x1F           ; S (scancode 0x1F)
     je move_down_2
-    cmp ah, 0x1E  ; A
+    cmp ah, 0x1E           ; A (scancode 0x1E)
     je move_left_2
-    cmp ah, 0x20  ; D
+    cmp ah, 0x20           ; D (scancode 0x20)
     je move_right_2
 
     ret
 
-; === Jugador 1 (verde) (0..639 x, 0..479 y) ===
+; --- Rutinas de movimiento para Jugador 1 (verde) ---
+; Cada rutina valida que no se salga de los límites (0..639, 0..479)
 move_up_1:
-    cmp word [player_y], 1
-    jle done
-    sub word [player_y], 10
+    cmp word [player_y], 1     ; Verifica límite superior
+    jle done                   ; Si ya está en el límite, no hace nada
+    sub word [player_y], 10    ; Mueve 10 píxeles hacia arriba
     jmp done
 
 move_down_1:
-    cmp word [player_y], 470
-    jge done
-    add word [player_y], 10
+    cmp word [player_y], 470   ; Verifica límite inferior (479-alto del jugador)
+    jge done                   ; Si ya está en el límite, no hace nada
+    add word [player_y], 10    ; Mueve 10 píxeles hacia abajo
     jmp done
 
 move_left_1:
-    cmp word [player_x], 1
-    jle done
-    sub word [player_x], 10
+    cmp word [player_x], 1     ; Verifica límite izquierdo
+    jle done                   ; Si ya está en el límite, no hace nada
+    sub word [player_x], 10    ; Mueve 10 píxeles a la izquierda
     jmp done
 
 move_right_1:
-    cmp word [player_x], 630
-    jge done
-    add word [player_x], 10
+    cmp word [player_x], 630   ; Verifica límite derecho (639-ancho del jugador)
+    jge done                   ; Si ya está en el límite, no hace nada
+    add word [player_x], 10    ; Mueve 10 píxeles a la derecha
     jmp done
 
-; === Jugador 2 (rojo) ===
+; --- Rutinas de movimiento para Jugador 2 (rojo) ---
+; Similar al jugador 1 pero controla al segundo jugador
 move_up_2:
-    cmp word [player2_y], 1
-    jle done
-    sub word [player2_y], 10
+    cmp word [player2_y], 1    ; Verifica límite superior
+    jle done                   ; Si ya está en el límite, no hace nada
+    sub word [player2_y], 10   ; Mueve 10 píxeles hacia arriba
     jmp done
 
 move_down_2:
-    cmp word [player2_y], 470
-    jge done
-    add word [player2_y], 10
+    cmp word [player2_y], 470  ; Verifica límite inferior
+    jge done                   ; Si ya está en el límite, no hace nada
+    add word [player2_y], 10   ; Mueve 10 píxeles hacia abajo
     jmp done
 
 move_left_2:
-    cmp word [player2_x], 1
-    jle done
-    sub word [player2_x], 10
+    cmp word [player2_x], 1    ; Verifica límite izquierdo
+    jle done                   ; Si ya está en el límite, no hace nada
+    sub word [player2_x], 10   ; Mueve 10 píxeles a la izquierda
     jmp done
 
 move_right_2:
-    cmp word [player2_x], 630
-    jge done
-    add word [player2_x], 10
+    cmp word [player2_x], 630  ; Verifica límite derecho
+    jge done                   ; Si ya está en el límite, no hace nada
+    add word [player2_x], 10   ; Mueve 10 píxeles a la derecha
     jmp done
 
 done:
     ret
 
-; ===============================
-; SUBRUTINA: MOVER EL BOT
-; ===============================
+; =============================================================================
+; SUBRUTINA: MOVER EL BOT 1
+; =============================================================================
+; Controla el movimiento del Bot 1 según su dirección actual y velocidad
+; La dirección se ajusta en los "waypoints" (puntos de cambio)
+; =============================================================================
 move_bot:
-    ; Primero comprobar si ha llegado a un punto de cambio
+    ; Primero comprobar si ha llegado a un punto de cambio de dirección
     call check_bot_waypoints
     
-    ; Luego realizar el movimiento según la dirección actual
-    cmp byte [bot_direction], 1  ; Derecha
+    ; Realizar el movimiento según la dirección actual
+    cmp byte [bot_direction], 1  ; ¿Dirección derecha?
     je bot_move_right
-    cmp byte [bot_direction], 2  ; Abajo
+    cmp byte [bot_direction], 2  ; ¿Dirección abajo?
     je bot_move_down
-    cmp byte [bot_direction], 3  ; Izquierda
+    cmp byte [bot_direction], 3  ; ¿Dirección izquierda?
     je bot_move_left
-    cmp byte [bot_direction], 4  ; Arriba
+    cmp byte [bot_direction], 4  ; ¿Dirección arriba?
     je bot_move_up
     ret
 
+; --- Rutinas de movimiento según dirección ---
 bot_move_right:
-    mov cx, [bot_speed]
-    add word [bot_x], cx
+    mov cx, [bot_speed]      ; Usar velocidad del bot para el desplazamiento
+    add word [bot_x], cx     ; Mover bot hacia la derecha
     ret
 
 bot_move_down:
-    mov cx, [bot_speed]
-    add word [bot_y], cx
+    mov cx, [bot_speed]      ; Usar velocidad del bot
+    add word [bot_y], cx     ; Mover bot hacia abajo
     ret
 
 bot_move_left:
-    mov cx, [bot_speed]
-    sub word [bot_x], cx
+    mov cx, [bot_speed]      ; Usar velocidad del bot
+    sub word [bot_x], cx     ; Mover bot hacia la izquierda
     ret
 
 bot_move_up:
-    mov cx, [bot_speed]
-    sub word [bot_y], cx
+    mov cx, [bot_speed]      ; Usar velocidad del bot
+    sub word [bot_y], cx     ; Mover bot hacia arriba
     ret
 
-; ===============================
+; =============================================================================
 ; SUBRUTINA: MOVER EL BOT 2
-; ===============================
+; =============================================================================
+; Controla el movimiento del Bot 2 de manera similar al Bot 1
+; =============================================================================
 move_bot2:
     ; Comprobar si ha llegado a un punto de cambio
     call check_bot2_waypoints
     
+    ; Comprobar si ha llegado a un punto de cambio de dirección
+    call check_bot2_waypoints
+    
     ; Realizar el movimiento según la dirección actual
-    cmp byte [bot2_direction], 1  ; Derecha
+    cmp byte [bot2_direction], 1  ; ¿Dirección derecha?
     je bot2_move_right
-    cmp byte [bot2_direction], 2  ; Abajo
+    cmp byte [bot2_direction], 2  ; ¿Dirección abajo?
     je bot2_move_down
-    cmp byte [bot2_direction], 3  ; Izquierda
+    cmp byte [bot2_direction], 3  ; ¿Dirección izquierda?
     je bot2_move_left
-    cmp byte [bot2_direction], 4  ; Arriba
+    cmp byte [bot2_direction], 4  ; ¿Dirección arriba?
     je bot2_move_up
     ret
 
+; --- Rutinas de movimiento del Bot 2 ---
 bot2_move_right:
-    mov cx, [bot2_speed]
-    add word [bot2_x], cx
+    mov cx, [bot2_speed]     ; Usar velocidad del bot 2
+    add word [bot2_x], cx    ; Mover hacia la derecha
     ret
 
 bot2_move_down:
-    mov cx, [bot2_speed]
-    add word [bot2_y], cx
+    mov cx, [bot2_speed]     ; Usar velocidad del bot 2
+    add word [bot2_y], cx    ; Mover hacia abajo
     ret
 
 bot2_move_left:
-    mov cx, [bot2_speed]
-    sub word [bot2_x], cx
+    mov cx, [bot2_speed]     ; Usar velocidad del bot 2
+    sub word [bot2_x], cx    ; Mover hacia la izquierda
     ret
 
 bot2_move_up:
-    mov cx, [bot2_speed]
-    sub word [bot2_y], cx
+    mov cx, [bot2_speed]     ; Usar velocidad del bot 2
+    sub word [bot2_y], cx    ; Mover hacia arriba
     ret
     
-; ===============================
+; =============================================================================
 ; SUBRUTINA: MOVER EL BOT 3
-; ===============================
+; =============================================================================
+; Controla el movimiento del Bot 3 de manera similar a los otros bots
+; =============================================================================
 move_bot3:
     ; Comprobar si ha llegado a un punto de cambio
     call check_bot3_waypoints
     
+    ; Comprobar si ha llegado a un punto de cambio
+    call check_bot3_waypoints
+    
     ; Realizar el movimiento según la dirección actual
-    cmp byte [bot3_direction], 1  ; Derecha
+    cmp byte [bot3_direction], 1  ; ¿Dirección derecha?
     je bot3_move_right
-    cmp byte [bot3_direction], 2  ; Abajo
+    cmp byte [bot3_direction], 2  ; ¿Dirección abajo?
     je bot3_move_down
-    cmp byte [bot3_direction], 3  ; Izquierda
+    cmp byte [bot3_direction], 3  ; ¿Dirección izquierda?
     je bot3_move_left
-    cmp byte [bot3_direction], 4  ; Arriba
+    cmp byte [bot3_direction], 4  ; ¿Dirección arriba?
     je bot3_move_up
     ret
 
+; --- Rutinas de movimiento del Bot 3 ---
 bot3_move_right:
-    mov cx, [bot3_speed]
-    add word [bot3_x], cx
+    mov cx, [bot3_speed]     ; Usar velocidad del bot 3
+    add word [bot3_x], cx    ; Mover hacia la derecha
     ret
 
 bot3_move_down:
-    mov cx, [bot3_speed]
-    add word [bot3_y], cx
+    mov cx, [bot3_speed]     ; Usar velocidad del bot 3
+    add word [bot3_y], cx    ; Mover hacia abajo
     ret
 
 bot3_move_left:
-    mov cx, [bot3_speed]
-    sub word [bot3_x], cx
+    mov cx, [bot3_speed]     ; Usar velocidad del bot 3
+    sub word [bot3_x], cx    ; Mover hacia la izquierda
     ret
 
 bot3_move_up:
-    mov cx, [bot3_speed]
-    sub word [bot3_y], cx
+    mov cx, [bot3_speed]     ; Usar velocidad del bot 3
+    sub word [bot3_y], cx    ; Mover hacia arriba
     ret
-; ===============================
-; SUBRUTINA: VERIFICAR PUNTOS DE CAMBIO DEL BOT
-; ===============================
+
+
+; =============================================================================
+; SUBRUTINA: VERIFICAR PUNTOS DE CAMBIO DEL BOT 1
+; =============================================================================
+; Comprueba si el Bot 1 ha llegado a alguno de los 4 waypoints donde
+; debe cambiar de dirección. Usa un sistema de detección por cercanía.
+; =============================================================================
 check_bot_waypoints:
     ; Comprueba si el bot ha llegado al punto de cambio 1 (USANDO RANGOS)
+    ; 1) Calcular distancia en X al waypoint1
     mov ax, [bot_x]
     sub ax, [waypoint1_x]     ; AX = bot_x - waypoint1_x
     jns check_wp1_positive    ; Si es positivo, seguir
@@ -504,6 +535,7 @@ check_wp1_positive:
     cmp ax, [waypoint_range]  ; Comparar con el rango aceptable
     ja check_waypoint2        ; Si está fuera del rango, comprobar el siguiente waypoint
     
+    ; 2) Calcular distancia en Y al waypoint1
     mov ax, [bot_y]
     sub ax, [waypoint1_y]
     jns check_wp1_y_positive
@@ -513,8 +545,8 @@ check_wp1_y_positive:
     ja check_waypoint2
     
     ; Si llegó aquí, el bot está en el rango del waypoint1
-    mov al, [waypoint1_dir]
-    mov [bot_direction], al
+    mov al, [waypoint1_dir]    ; Cargar nueva dirección
+    mov [bot_direction], al    ; Aplicar cambio de dirección
     jmp end_check_waypoints
     
 check_waypoint2:
@@ -588,10 +620,11 @@ check_wp4_y_positive:
 end_check_waypoints:
     ret
 
-
-; ===============================
+; =============================================================================
 ; SUBRUTINA: VERIFICAR PUNTOS DE CAMBIO DEL BOT 2
-; ===============================
+; =============================================================================
+; Similar a la función para el Bot 1, pero para el Bot 2
+; =============================================================================
 check_bot2_waypoints:
     ; Bot 2 usa los mismos waypoints que el bot 1
     
@@ -688,9 +721,12 @@ check_wp4_y_bot2_positive:
 end_check_waypoints_bot2:
     ret
 
-; ===============================
+; =============================================================================
 ; SUBRUTINA: VERIFICAR PUNTOS DE CAMBIO DEL BOT 3
-; ===============================
+; =============================================================================
+; Similar a las anteriores, verifica si el Bot 3 ha llegado a los waypoints
+; para cambiar su dirección
+; =============================================================================
 check_bot3_waypoints:
     ; Bot 3 usa los mismos waypoints que los otros bots
     
@@ -787,134 +823,159 @@ check_wp4_y_bot3_positive:
 end_check_waypoints_bot3:
     ret
 
-; ===============================
+; =============================================================================
 ; SUBRUTINA: DIBUJAR RECTÁNGULO
-; ===============================
+; =============================================================================
+; Dibuja un rectángulo con el color y dimensiones especificados
+; Entrada:
+;   - AL = color del rectángulo (0-15 en modo VGA)
+;   - CX = coordenada X (esquina superior izquierda)
+;   - DX = coordenada Y (esquina superior izquierda)
+;   - SI = ancho del rectángulo en píxeles
+;   - DI = alto del rectángulo en píxeles
+; =============================================================================
 draw_rectangle:
-    ; Entra: AL=color, CX=x, DX=y, SI=ancho, DI=alto
+    ; Preservar registros que usa la función
     push cx
     push dx
     push si
-    mov bx, di  ; guardamos alto en bx
+    mov bx, di  ; guardamos alto en bx (liberamos DI)
 
 .filas:
-    mov si, [esp]    ; ancho en SI (cada vuelta se reinicia)
-    mov cx, [esp+4]  ; X inicial
+    mov si, [esp]       ; ancho en SI (cada vuelta se reinicia)
+    mov cx, [esp+4]     ; X inicial (desde la pila)
 
 .columnas:
-    mov ah, 0x0C
-    xor bh, bh       ; página 0
-    int 0x10
+    mov ah, 0x0C        ; Función BIOS: Escribir píxel
+    xor bh, bh          ; Página 0 de video
+    int 0x10            ; Interrupción gráfica BIOS
 
-    inc cx
-    dec si
-    jnz .columnas
+    inc cx              ; Siguiente píxel en X
+    dec si              ; Decrementar contador de ancho
+    jnz .columnas       ; Continuar si no se ha dibujado toda la fila
 
-    inc dx
-    dec bx
-    jnz .filas
+    inc dx              ; Siguiente fila (Y)
+    dec bx              ; Decrementar contador de alto
+    jnz .filas          ; Continuar si no se han dibujado todas las filas
 
+    ; Restaurar registros
     pop si
     pop dx
     pop cx
     ret
 
-; ===============================
+; =============================================================================
 ; SUBRUTINA: ACTUALIZAR TEMPORIZADOR
-; ===============================
+; =============================================================================
+; Muestra el tiempo restante de juego en la pantalla
+; El juego termina cuando el tiempo llega a cero
+; =============================================================================
 update_timer:
-    pusha
-    ; Obtener ticks actuales
-    mov ah, 0x00
-    int 0x1A
+    pusha               ; Preservar todos los registros
+    
+    ; Obtener ticks actuales del reloj del sistema
+    mov ah, 0x00        ; Función 0 de INT 1Ah: Obtener ticks
+    int 0x1A            ; Interrupción BIOS de reloj
     mov [time_current], dx
 
-    ; Calcular segundos transcurridos (18.2 ticks/segundo)
+    ; Calcular segundos transcurridos (18.2 ticks/segundo en BIOS)
     mov ax, [time_current]
-    sub ax, [time_start]
-    xor dx, dx
-    mov cx, 18
-    div cx          ; AX = segundos aproximados
+    sub ax, [time_start]    ; AX = ticks transcurridos
+    xor dx, dx              ; Limpiar DX para división
+    mov cx, 18              ; Aproximadamente 18.2 ticks/segundo
+    div cx                  ; AX = segundos aproximados
 
-    ; Calcular segundos restantes
-    mov bx, 60
-    sub bx, ax
+    ; Calcular segundos restantes (partida de 60 segundos)
+    mov bx, 60              ; Tiempo inicial: 60 segundos
+    sub bx, ax              ; BX = segundos restantes
     mov [time_seconds], bx
 
+    ; Verificar si se acabó el tiempo
     cmp word [time_seconds], 0
-    jne .continue_game
-    jmp game_over
+    jne .continue_game      ; Si aún hay tiempo, continuar
+    jmp game_over           ; Si tiempo = 0, fin del juego
 
     .continue_game:
-
-
-    ; Actualizar cadena del tiempo
-    mov di, time_str + 6  ; Posición del número en "Time: 60"
+    ; Actualizar cadena del tiempo para mostrar en pantalla
+    mov di, time_str + 6    ; Posición del número en "Time: 60"
     mov ax, [time_seconds]
-    call word_to_ascii
+    call word_to_ascii      ; Convertir valor a ASCII
 
-    ; Dibujar el tiempo en (0,0)
-    mov ah, 0x13        ; Función BIOS: Escribir cadena
-    mov al, 0x01        ; Modo de escritura (actualizar posición)
-    mov bh, 0x00        ; Página 0
-    mov bl, 0x0F        ; Color blanco sobre negro
-    mov cx, 8           ; Longitud de la cadena
-    mov dh, 17           ; Fila 0
-    mov dl, 3           ; Columna 0
-    mov bp, time_str
-    int 0x10
+    ; Dibujar el tiempo en pantalla
+    mov ah, 0x13            ; Función BIOS: Escribir cadena
+    mov al, 0x01            ; Modo de escritura (actualizar posición)
+    mov bh, 0x00            ; Página 0
+    mov bl, 0x0F            ; Color blanco sobre negro
+    mov cx, 8               ; Longitud de la cadena
+    mov dh, 17              ; Fila 17
+    mov dl, 3               ; Columna 3
+    mov bp, time_str        ; Dirección de la cadena
+    int 0x10                ; Interrupción de video BIOS
 
-    popa
+    popa                    ; Restaurar registros
     ret
 
+; =============================================================================
+; SUBRUTINA: GAME OVER
+; =============================================================================
+; Maneja el fin del juego cuando el tiempo llega a cero
+; Cambia a modo texto, determina el ganador y muestra el resultado
+; =============================================================================
 game_over:
     ; Cambiar a modo texto 80x25 (16 colores)
-    mov ax, 0x0003
-    int 0x10
+    mov ax, 0x0003          ; Modo texto estándar
+    int 0x10                ; Cambiar modo de video
     
-    call determine_winner
-    call show_winner_message
+    call determine_winner   ; Determinar ganador(es)
+    call show_winner_message ; Mostrar mensaje con el ganador
 .halt:
-    jmp .halt  ; Bucle infinito para congelar el juego
+    jmp .halt               ; Bucle infinito para congelar el juego
 
-
-; ===============================
+; =============================================================================
 ; SUBRUTINA: CONVERTIR WORD A ASCII
-; Entrada: AX = número, DI = destino
-; ===============================
+; =============================================================================
+; Convierte un valor numérico en cadena ASCII
+; Entrada: 
+;   - AX = número a convertir
+;   - DI = dirección de destino para guardar
+; =============================================================================
 word_to_ascii:
     pusha
-    mov cx, 10
-    xor dx, dx
-    div cx          ; AX = cociente, DX = residuo
-    add dl, '0'     ; Convertir residuo a ASCII
-    mov [di+1], dl
-    xor dx, dx
-    div cx
-    add dl, '0'
-    mov [di], dl
-    popa
+    mov cx, 10              ; Divisor (base 10)
+    xor dx, dx              ; Limpiar DX para división
+    div cx                  ; AX = cociente, DX = residuo
+    add dl, '0'             ; Convertir residuo a ASCII
+    mov [di+1], dl          ; Guardar segundo dígito
+    xor dx, dx              ; Limpiar DX para división
+    div cx                  ; División nuevamente para primer dígito
+    add dl, '0'             ; Convertir a ASCII
+    mov [di], dl            ; Guardar primer dígito
+    popa                    ; Restaurar registros
     ret
 
-; ===============================
+; =============================================================================
 ; SUBRUTINA: DIBUJAR LA PISTA
-; ===============================
+; =============================================================================
+; Dibuja la pista de carreras con rectángulos blancos
+; La pista define los límites del circuito
+; =============================================================================
 draw_track:
-    ;al: Color del rectángulo (siempre 15, que es blanco en la paleta estándar VGA)
-    ;cx: Coordenada X de la esquina superior izquierda
-    ;dx: Coordenada Y de la esquina superior izquierda
-    ;si: Ancho del rectángulo en píxeles
-    ;di: Alto del rectángulo en píxeles
+    ; Parámetros para dibujar:
+    ; AL: Color del rectángulo (15 = blanco)
+    ; CX: Coordenada X de la esquina superior izquierda
+    ; DX: Coordenada Y de la esquina superior izquierda
+    ; SI: Ancho del rectángulo
+    ; DI: Alto del rectángulo
 
-    ; Tramo 1.1
-    mov al, 15
-    mov cx, 20
-    mov dx, 15
-    mov si, 600
-    mov di, 5
+    ; Tramo 1.1 - Borde superior horizontal
+    mov al, 15              ; Color blanco
+    mov cx, 20              ; X inicial
+    mov dx, 15              ; Y inicial
+    mov si, 600             ; Ancho
+    mov di, 5               ; Alto
     call draw_rectangle
 
-    ; Tramo 1.2
+    ; Tramo 1.2 - Borde superior interno horizontal
     mov al, 15
     mov cx, 80
     mov dx, 75
@@ -922,7 +983,7 @@ draw_track:
     mov di, 5
     call draw_rectangle
 
-    ; Tramo 2.1
+    ; Tramo 2.1 - Borde derecho externo vertical
     mov al, 15
     mov cx, 620
     mov dx, 15
@@ -930,7 +991,7 @@ draw_track:
     mov di, 250
     call draw_rectangle
 
-    ; Tramo 2.2
+    ; Tramo 2.2 - Borde derecho interno vertical
     mov al, 15
     mov cx, 555
     mov dx, 80
@@ -938,7 +999,7 @@ draw_track:
     mov di, 125
     call draw_rectangle
 
-    ; Tramo 3.1
+    ; Tramo 3.1 - Borde inferior externo horizontal
     mov al, 15
     mov cx, 25
     mov dx, 265
@@ -946,7 +1007,7 @@ draw_track:
     mov di, 5
     call draw_rectangle
 
-    ; Tramo 3.2
+    ; Tramo 3.2 - Borde inferior interno horizontal
     mov al, 15
     mov cx, 80
     mov dx, 200
@@ -954,7 +1015,7 @@ draw_track:
     mov di, 5
     call draw_rectangle
 
-    ; Tramo 4.1
+    ; Tramo 4.1 - Borde izquierdo externo vertical
     mov al, 15
     mov cx, 20
     mov dx, 15
@@ -962,7 +1023,7 @@ draw_track:
     mov di, 255
     call draw_rectangle
 
-    ; Tramo 4.2
+    ; Tramo 4.2 - Borde izquierdo interno vertical
     mov al, 15
     mov cx, 80
     mov dx, 75
@@ -970,11 +1031,7 @@ draw_track:
     mov di, 125
     call draw_rectangle
 
-
-
     ret
-
-
 
 
 ; ===============================
