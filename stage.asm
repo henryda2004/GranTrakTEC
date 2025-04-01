@@ -835,6 +835,10 @@ update_timer:
     ret
 
 game_over:
+    ; Cambiar a modo texto 80x25 (16 colores)
+    mov ax, 0x0003
+    int 0x10
+    
     call determine_winner
     call show_winner_message
 .halt:
@@ -1663,42 +1667,42 @@ show_winner_message:
     mov ah, 0x13
     mov al, 0x01
     mov bh, 0
-    mov bl, 0x0E  ; color que quieras
-    mov dh, 19
-    mov dl, 10
+    mov bl, 0x0E  ; color
+    mov dh, 5      ; Fila 5 (modo texto)
+    mov dl, 33     ; Columna centrada
     mov cx, 12
     mov bp, victory_str
     int 0x10
 
-    ; AL = flags
-    mov al, [winner_flags]
+    ; Variables para posiciones
+    mov byte [current_row], 7  ; Fila inicial para los ganadores
 
-    ; bit 0 => Jugador 1
-    test al, 1
+    ; Verificar cada bandera
+    test byte [winner_flags], 1
     jz .check_p2
     call print_p1
+    inc byte [current_row]
 
 .check_p2:
-    ; bit 1 => Jugador 2
-    test al, 2
+    test byte [winner_flags], 2
     jz .check_b1
     call print_p2
+    inc byte [current_row]
 
 .check_b1:
-    ; bit 2 => Bot 1
-    test al, 4
+    test byte [winner_flags], 4
     jz .check_b2
     call print_b1
+    inc byte [current_row]
 
 .check_b2:
-    ; bit 3 => Bot 2
-    test al, 8
+    test byte [winner_flags], 8
     jz .check_b3
     call print_b2
+    inc byte [current_row]
 
 .check_b3:
-    ; bit 4 => Bot 3
-    test al, 16
+    test byte [winner_flags], 16
     jz .done
     call print_b3
 
@@ -1706,14 +1710,14 @@ show_winner_message:
     popa
     ret
 
-
+; Subrutinas de impresión actualizadas
 print_p1:
     mov ah, 0x13
     mov al, 0x01
     mov bh, 0
     mov bl, 0x0A
-    mov dh, 20
-    mov dl, 10
+    mov dh, [current_row]
+    mov dl, 33
     mov cx, 14
     mov bp, p1_win_str
     int 0x10
@@ -1724,8 +1728,8 @@ print_p2:
     mov al, 0x01
     mov bh, 0
     mov bl, 0x0C
-    mov dh, 21
-    mov dl, 10
+    mov dh, [current_row]
+    mov dl, 33
     mov cx, 14
     mov bp, p2_win_str
     int 0x10
@@ -1736,8 +1740,8 @@ print_b1:
     mov al, 0x01
     mov bh, 0
     mov bl, 0x01
-    mov dh, 22
-    mov dl, 10
+    mov dh, [current_row]
+    mov dl, 33
     mov cx, 10
     mov bp, b1_win_str
     int 0x10
@@ -1748,8 +1752,8 @@ print_b2:
     mov al, 0x01
     mov bh, 0
     mov bl, 0x0E
-    mov dh, 23
-    mov dl, 10
+    mov dh, [current_row]
+    mov dl, 33
     mov cx, 10
     mov bp, b2_win_str
     int 0x10
@@ -1760,13 +1764,12 @@ print_b3:
     mov al, 0x01
     mov bh, 0
     mov bl, 0x05
-    mov dh, 24
-    mov dl, 10
+    mov dh, [current_row]
+    mov dl, 33
     mov cx, 10
     mov bp, b3_win_str
     int 0x10
     ret
-
 
 ; ===============================
 ; SECCIÓN DE DATOS
@@ -1907,6 +1910,8 @@ b3_win_str     db 'Bot 3 (P5)', 0
 
 max_laps       dw 0
 winner_flags   db 0
+
+current_row db 7  ; Fila actual para imprimir ganadores
 
 ; Observa que aquí ya no utilizamos "TIMES 510 - ($-$$) db 0" ni "dw 0xAA55"
 ; porque esto NO es un boot sector.
