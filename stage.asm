@@ -808,6 +808,13 @@ update_timer:
     sub bx, ax
     mov [time_seconds], bx
 
+    cmp word [time_seconds], 0
+    jne .continue_game
+    jmp game_over
+
+    .continue_game:
+
+
     ; Actualizar cadena del tiempo
     mov di, time_str + 6  ; Posición del número en "Time: 60"
     mov ax, [time_seconds]
@@ -826,6 +833,13 @@ update_timer:
 
     popa
     ret
+
+game_over:
+    call determine_winner
+    call show_winner_message
+.halt:
+    jmp .halt  ; Bucle infinito para congelar el juego
+
 
 ; ===============================
 ; SUBRUTINA: CONVERTIR WORD A ASCII
@@ -1571,6 +1585,189 @@ update_lap_counter_bot3:
     
     popa
     ret
+
+
+determine_winner:
+    pusha
+
+    ; Find the maximum lap count first
+    mov ax, [player1_laps]
+    mov bx, [player2_laps]
+    cmp bx, ax
+    jle .check_b1_max
+    mov ax, bx
+    
+.check_b1_max:
+    mov bx, [bot1_laps]
+    cmp bx, ax
+    jle .check_b2_max
+    mov ax, bx
+    
+.check_b2_max:
+    mov bx, [bot2_laps]
+    cmp bx, ax
+    jle .check_b3_max
+    mov ax, bx
+    
+.check_b3_max:
+    mov bx, [bot3_laps]
+    cmp bx, ax
+    jle .set_max
+    mov ax, bx
+
+.set_max:
+    ; Now ax has the maximum lap count
+    mov [max_laps], ax
+    
+    ; Reset all winner flags
+    mov byte [winner_flags], 0
+    
+    ; Check each player against the max
+    mov ax, [player1_laps]
+    cmp ax, [max_laps]
+    jne .check_p2
+    or byte [winner_flags], 1  ; Set P1 flag
+    
+.check_p2:
+    mov ax, [player2_laps]
+    cmp ax, [max_laps]
+    jne .check_b1
+    or byte [winner_flags], 2  ; Set P2 flag
+    
+.check_b1:
+    mov ax, [bot1_laps]
+    cmp ax, [max_laps]
+    jne .check_b2
+    or byte [winner_flags], 4  ; Set B1 flag
+    
+.check_b2:
+    mov ax, [bot2_laps]
+    cmp ax, [max_laps]
+    jne .check_b3
+    or byte [winner_flags], 8  ; Set B2 flag
+    
+.check_b3:
+    mov ax, [bot3_laps]
+    cmp ax, [max_laps]
+    jne .done
+    or byte [winner_flags], 16 ; Set B3 flag
+    
+.done:
+    popa
+    ret
+
+show_winner_message:
+    pusha
+
+    ; Mensaje fijo: "Ganador(es):"
+    mov ah, 0x13
+    mov al, 0x01
+    mov bh, 0
+    mov bl, 0x0E  ; color que quieras
+    mov dh, 19
+    mov dl, 10
+    mov cx, 12
+    mov bp, victory_str
+    int 0x10
+
+    ; AL = flags
+    mov al, [winner_flags]
+
+    ; bit 0 => Jugador 1
+    test al, 1
+    jz .check_p2
+    call print_p1
+
+.check_p2:
+    ; bit 1 => Jugador 2
+    test al, 2
+    jz .check_b1
+    call print_p2
+
+.check_b1:
+    ; bit 2 => Bot 1
+    test al, 4
+    jz .check_b2
+    call print_b1
+
+.check_b2:
+    ; bit 3 => Bot 2
+    test al, 8
+    jz .check_b3
+    call print_b2
+
+.check_b3:
+    ; bit 4 => Bot 3
+    test al, 16
+    jz .done
+    call print_b3
+
+.done:
+    popa
+    ret
+
+
+print_p1:
+    mov ah, 0x13
+    mov al, 0x01
+    mov bh, 0
+    mov bl, 0x0A
+    mov dh, 20
+    mov dl, 10
+    mov cx, 14
+    mov bp, p1_win_str
+    int 0x10
+    ret
+
+print_p2:
+    mov ah, 0x13
+    mov al, 0x01
+    mov bh, 0
+    mov bl, 0x0C
+    mov dh, 21
+    mov dl, 10
+    mov cx, 14
+    mov bp, p2_win_str
+    int 0x10
+    ret
+
+print_b1:
+    mov ah, 0x13
+    mov al, 0x01
+    mov bh, 0
+    mov bl, 0x01
+    mov dh, 22
+    mov dl, 10
+    mov cx, 10
+    mov bp, b1_win_str
+    int 0x10
+    ret
+
+print_b2:
+    mov ah, 0x13
+    mov al, 0x01
+    mov bh, 0
+    mov bl, 0x0E
+    mov dh, 23
+    mov dl, 10
+    mov cx, 10
+    mov bp, b2_win_str
+    int 0x10
+    ret
+
+print_b3:
+    mov ah, 0x13
+    mov al, 0x01
+    mov bh, 0
+    mov bl, 0x05
+    mov dh, 24
+    mov dl, 10
+    mov cx, 10
+    mov bp, b3_win_str
+    int 0x10
+    ret
+
+
 ; ===============================
 ; SECCIÓN DE DATOS
 ; ===============================
@@ -1699,6 +1896,17 @@ bot3_laps       dw 0      ; Vueltas del bot 3
 bot3_lap_str    db 'P5 Laps: 00', 0
 checkpoint2_passed_bot3 db 0
 in_checkpoint_bot3 db 0
+
+
+victory_str db 'Ganador(es):', 0
+p1_win_str     db 'Jugador 1 (P1)', 0
+p2_win_str     db 'Jugador 2 (P2)', 0
+b1_win_str     db 'Bot 1 (P3)', 0
+b2_win_str     db 'Bot 2 (P4)', 0
+b3_win_str     db 'Bot 3 (P5)', 0
+
+max_laps       dw 0
+winner_flags   db 0
 
 ; Observa que aquí ya no utilizamos "TIMES 510 - ($-$$) db 0" ni "dw 0xAA55"
 ; porque esto NO es un boot sector.
