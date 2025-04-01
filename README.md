@@ -180,6 +180,4 @@ Para que se cuente una vuelta completa, un jugador o bot debe pasar por el **Che
 - **QEMU**: Para emular y ejecutar el juego.
 - **Make** (opcional): Para usar el `Makefile`.
 
----
 
->>>>>>> timer
