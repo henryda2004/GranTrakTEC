@@ -1728,328 +1728,353 @@ update_lap_counter_bot3:
     popa
     ret
 
-
+; =============================================================================
+; SUBRUTINA: DETERMINAR GANADOR
+; =============================================================================
+; Compara el número de vueltas de todos los participantes para determinar
+; quién ha ganado la carrera cuando se acaba el tiempo.
+; Puede haber varios ganadores en caso de empate.
+; =============================================================================
 determine_winner:
     pusha
 
-    ; Find the maximum lap count first
+    ; Encontrar primero el número máximo de vueltas entre todos
     mov ax, [player1_laps]
     mov bx, [player2_laps]
-    cmp bx, ax
-    jle .check_b1_max
-    mov ax, bx
+    cmp bx, ax               ; Comparar vueltas P2 con máximo actual
+    jle .check_b1_max        ; Si P2 <= máximo actual, verificar siguiente
+    mov ax, bx               ; Si P2 > máximo actual, actualizar máximo
     
 .check_b1_max:
     mov bx, [bot1_laps]
-    cmp bx, ax
-    jle .check_b2_max
-    mov ax, bx
+    cmp bx, ax               ; Comparar vueltas Bot1 con máximo actual
+    jle .check_b2_max        ; Si Bot1 <= máximo actual, verificar siguiente
+    mov ax, bx               ; Si Bot1 > máximo actual, actualizar máximo
     
 .check_b2_max:
     mov bx, [bot2_laps]
-    cmp bx, ax
-    jle .check_b3_max
-    mov ax, bx
+    cmp bx, ax               ; Comparar vueltas Bot2 con máximo actual
+    jle .check_b3_max        ; Si Bot2 <= máximo actual, verificar siguiente
+    mov ax, bx               ; Si Bot2 > máximo actual, actualizar máximo
     
 .check_b3_max:
     mov bx, [bot3_laps]
-    cmp bx, ax
-    jle .set_max
-    mov ax, bx
+    cmp bx, ax               ; Comparar vueltas Bot3 con máximo actual
+    jle .set_max             ; Si Bot3 <= máximo actual, no actualizar
+    mov ax, bx               ; Si Bot3 > máximo actual, actualizar máximo
 
 .set_max:
-    ; Now ax has the maximum lap count
-    mov [max_laps], ax
-    
-    ; Reset all winner flags
+    ; Ahora AX tiene el número máximo de vueltas
+    mov [max_laps], ax       ; Guardar número máximo de vueltas
+
+    ; Resetear todos los flags de ganador
     mov byte [winner_flags], 0
     
-    ; Check each player against the max
+    ; Verificar cada participante contra el máximo y marcar ganadores
     mov ax, [player1_laps]
-    cmp ax, [max_laps]
-    jne .check_p2
-    or byte [winner_flags], 1  ; Set P1 flag
+    cmp ax, [max_laps]       ; ¿P1 tiene el máximo de vueltas?
+    jne .check_p2            ; Si no, verificar siguiente
+    or byte [winner_flags], 1  ; Marcar P1 como ganador (bit 0)
     
 .check_p2:
     mov ax, [player2_laps]
-    cmp ax, [max_laps]
-    jne .check_b1
-    or byte [winner_flags], 2  ; Set P2 flag
+    cmp ax, [max_laps]       ; ¿P2 tiene el máximo de vueltas?
+    jne .check_b1            ; Si no, verificar siguiente
+    or byte [winner_flags], 2  ; Marcar P2 como ganador (bit 1)
     
 .check_b1:
     mov ax, [bot1_laps]
-    cmp ax, [max_laps]
-    jne .check_b2
-    or byte [winner_flags], 4  ; Set B1 flag
+    cmp ax, [max_laps]       ; ¿Bot1 tiene el máximo de vueltas?
+    jne .check_b2            ; Si no, verificar siguiente
+    or byte [winner_flags], 4  ; Marcar Bot1 como ganador (bit 2)
     
 .check_b2:
     mov ax, [bot2_laps]
-    cmp ax, [max_laps]
-    jne .check_b3
-    or byte [winner_flags], 8  ; Set B2 flag
+    cmp ax, [max_laps]       ; ¿Bot2 tiene el máximo de vueltas?
+    jne .check_b3            ; Si no, verificar siguiente
+    or byte [winner_flags], 8  ; Marcar Bot2 como ganador (bit 3)
     
 .check_b3:
     mov ax, [bot3_laps]
-    cmp ax, [max_laps]
-    jne .done
-    or byte [winner_flags], 16 ; Set B3 flag
+    cmp ax, [max_laps]       ; ¿Bot3 tiene el máximo de vueltas?
+    jne .done                ; Si no, terminar
+    or byte [winner_flags], 16 ; Marcar Bot3 como ganador (bit 4)
     
 .done:
     popa
     ret
 
+; =============================================================================
+; SUBRUTINA: MOSTRAR MENSAJE DE GANADOR
+; =============================================================================
+; Muestra en pantalla quién(es) ha(n) ganado la carrera
+; Procesa los flags de ganador y muestra el texto correspondiente
+; =============================================================================
 show_winner_message:
     pusha
 
     ; Mensaje fijo: "Ganador(es):"
-    mov ah, 0x13
-    mov al, 0x01
-    mov bh, 0
-    mov bl, 0x0E  ; color
-    mov dh, 5      ; Fila 5 (modo texto)
-    mov dl, 33     ; Columna centrada
-    mov cx, 12
-    mov bp, victory_str
+    mov ah, 0x13             ; Función BIOS: Escribir cadena
+    mov al, 0x01             ; Modo de escritura (actualizar posición)
+    mov bh, 0                ; Página 0
+    mov bl, 0x0E             ; Color amarillo
+    mov dh, 5                ; Fila 5 (modo texto)
+    mov dl, 33               ; Columna centrada
+    mov cx, 12               ; Longitud de la cadena
+    mov bp, victory_str      ; Dirección de la cadena
     int 0x10
 
     ; Variables para posiciones
-    mov byte [current_row], 7  ; Fila inicial para los ganadores
+    mov byte [current_row], 7  ; Fila inicial para mostrar ganadores
 
-    ; Verificar cada bandera
-    test byte [winner_flags], 1
-    jz .check_p2
-    call print_p1
-    inc byte [current_row]
+    ; Verificar cada flag de ganador y mostrar el mensaje correspondiente
+    test byte [winner_flags], 1  ; ¿Jugador 1 ganó? (bit 0)
+    jz .check_p2                 ; Si no, verificar siguiente
+    call print_p1                ; Mostrar mensaje para Jugador 1
+    inc byte [current_row]       ; Avanzar a siguiente fila
 
 .check_p2:
-    test byte [winner_flags], 2
-    jz .check_b1
-    call print_p2
-    inc byte [current_row]
+    test byte [winner_flags], 2  ; ¿Jugador 2 ganó? (bit 1)
+    jz .check_b1                 ; Si no, verificar siguiente
+    call print_p2                ; Mostrar mensaje para Jugador 2
+    inc byte [current_row]       ; Avanzar a siguiente fila
 
 .check_b1:
-    test byte [winner_flags], 4
-    jz .check_b2
-    call print_b1
-    inc byte [current_row]
+    test byte [winner_flags], 4  ; ¿Bot 1 ganó? (bit 2)
+    jz .check_b2                 ; Si no, verificar siguiente
+    call print_b1                ; Mostrar mensaje para Bot 1
+    inc byte [current_row]       ; Avanzar a siguiente fila
 
 .check_b2:
-    test byte [winner_flags], 8
-    jz .check_b3
-    call print_b2
-    inc byte [current_row]
+    test byte [winner_flags], 8  ; ¿Bot 2 ganó? (bit 3)
+    jz .check_b3                 ; Si no, verificar siguiente
+    call print_b2                ; Mostrar mensaje para Bot 2
+    inc byte [current_row]       ; Avanzar a siguiente fila
 
 .check_b3:
-    test byte [winner_flags], 16
-    jz .done
-    call print_b3
+    test byte [winner_flags], 16  ; ¿Bot 3 ganó? (bit 4)
+    jz .done                      ; Si no, terminar
+    call print_b3                 ; Mostrar mensaje para Bot 3
 
 .done:
     popa
     ret
 
-; Subrutinas de impresión actualizadas
+
+; =============================================================================
+; SUBRUTINAS DE IMPRESIÓN DE GANADORES
+; =============================================================================
+; Cada subrutina muestra el mensaje correspondiente a un ganador
+; con su color característico
+; =============================================================================
+
+; Imprime mensaje ganador para Jugador 1 (verde)
 print_p1:
-    mov ah, 0x13
-    mov al, 0x01
-    mov bh, 0
-    mov bl, 0x0A
-    mov dh, [current_row]
-    mov dl, 33
-    mov cx, 14
-    mov bp, p1_win_str
+    mov ah, 0x13             ; Función BIOS: Escribir cadena
+    mov al, 0x01             ; Modo de escritura (actualizar posición)
+    mov bh, 0                ; Página 0
+    mov bl, 0x0A             ; Color verde
+    mov dh, [current_row]    ; Fila actual (variable)
+    mov dl, 33               ; Columna centrada
+    mov cx, 14               ; Longitud de la cadena
+    mov bp, p1_win_str       ; Dirección de la cadena
     int 0x10
     ret
 
+; Imprime mensaje ganador para Jugador 2 (rojo)
 print_p2:
-    mov ah, 0x13
-    mov al, 0x01
-    mov bh, 0
-    mov bl, 0x0C
-    mov dh, [current_row]
-    mov dl, 33
-    mov cx, 14
-    mov bp, p2_win_str
+    mov ah, 0x13             ; Función BIOS: Escribir cadena
+    mov al, 0x01             ; Modo de escritura (actualizar posición)
+    mov bh, 0                ; Página 0
+    mov bl, 0x0C             ; Color rojo
+    mov dh, [current_row]    ; Fila actual (variable)
+    mov dl, 33               ; Columna centrada
+    mov cx, 14               ; Longitud de la cadena
+    mov bp, p2_win_str       ; Dirección de la cadena
     int 0x10
     ret
 
+; Imprime mensaje ganador para Bot 1 (azul)
 print_b1:
-    mov ah, 0x13
-    mov al, 0x01
-    mov bh, 0
-    mov bl, 0x01
-    mov dh, [current_row]
-    mov dl, 33
-    mov cx, 10
-    mov bp, b1_win_str
+    mov ah, 0x13             ; Función BIOS: Escribir cadena
+    mov al, 0x01             ; Modo de escritura (actualizar posición)
+    mov bh, 0                ; Página 0
+    mov bl, 0x01             ; Color azul
+    mov dh, [current_row]    ; Fila actual (variable)
+    mov dl, 33               ; Columna centrada
+    mov cx, 10               ; Longitud de la cadena
+    mov bp, b1_win_str       ; Dirección de la cadena
     int 0x10
     ret
 
+; Imprime mensaje ganador para Bot 2 (amarillo)
 print_b2:
-    mov ah, 0x13
-    mov al, 0x01
-    mov bh, 0
-    mov bl, 0x0E
-    mov dh, [current_row]
-    mov dl, 33
-    mov cx, 10
-    mov bp, b2_win_str
+    mov ah, 0x13             ; Función BIOS: Escribir cadena
+    mov al, 0x01             ; Modo de escritura (actualizar posición)
+    mov bh, 0                ; Página 0
+    mov bl, 0x0E             ; Color amarillo
+    mov dh, [current_row]    ; Fila actual (variable)
+    mov dl, 33               ; Columna centrada
+    mov cx, 10               ; Longitud de la cadena
+    mov bp, b2_win_str       ; Dirección de la cadena
     int 0x10
     ret
 
+; Imprime mensaje ganador para Bot 3 (morado)
 print_b3:
-    mov ah, 0x13
-    mov al, 0x01
-    mov bh, 0
-    mov bl, 0x05
-    mov dh, [current_row]
-    mov dl, 33
-    mov cx, 10
-    mov bp, b3_win_str
+    mov ah, 0x13             ; Función BIOS: Escribir cadena
+    mov al, 0x01             ; Modo de escritura (actualizar posición)
+    mov bh, 0                ; Página 0
+    mov bl, 0x05             ; Color morado
+    mov dh, [current_row]    ; Fila actual (variable)
+    mov dl, 33               ; Columna centrada
+    mov cx, 10               ; Longitud de la cadena
+    mov bp, b3_win_str       ; Dirección de la cadena
     int 0x10
     ret
 
-; ===============================
+; =============================================================================
 ; SECCIÓN DE DATOS
-; ===============================
-player_x        dw 100
-player_y        dw 25
-player_color    db 2      ; Verde
-player_width    dw 10
-player_height   dw 10
-old_x           dw 100
-old_y           dw 20
+; =============================================================================
+; Esta sección contiene todas las variables utilizadas por el programa
+; =============================================================================
 
-player2_x       dw 100
-player2_y       dw 40
-player2_color   db 4      ; Rojo
-player2_width   dw 10
-player2_height  dw 10
-old2_x          dw 100
-old2_y          dw 40
+; --- Posiciones y propiedades de los jugadores y bots ---
+player_x        dw 100      ; Posición X del jugador 1
+player_y        dw 25       ; Posición Y del jugador 1
+player_color    db 2        ; Color 2 (verde) para jugador 1
+player_width    dw 10       ; Ancho del jugador 1
+player_height   dw 10       ; Alto del jugador 1
+old_x           dw 100      ; Posición X anterior del jugador 1
+old_y           dw 20       ; Posición Y anterior del jugador 1
 
-
-bot_x          dw 100    ; Posición inicial en X
-bot_y          dw 55     ; Posición inicial en Y
-bot_color      db 1      ; Azul
-bot_width      dw 10     ; Ancho del bot
-bot_height     dw 10     ; Alto del bot
-old_bot_x      dw 100
-old_bot_y      dw 55
-bot_direction  db 1  ; 1=Derecha, 2=Abajo, 3=Izquierda, 4=Arriba
-
-
-; Bot 2
-bot2_x          dw 80    ; Posición inicial en X
-bot2_y          dw 50     ; Posición inicial en Y (un poco más abajo que el primer bot)
-bot2_color      db 14      ; Marrón
-bot2_width      dw 10     
-bot2_height     dw 10     
-old_bot2_x      dw 100
-old_bot2_y      dw 70
-bot2_direction  db 1      ; Dirección inicial: derecha
-
-; Bot 3
-bot3_x          dw 80    ; Posición inicial en X
-bot3_y          dw 30     ; Posición inicial en Y (un poco más abajo que el segundo bot)
-bot3_color      db 5      ; Magenta
-bot3_width      dw 10     
-bot3_height     dw 10     
-old_bot3_x      dw 100
-old_bot3_y      dw 85
-bot3_direction  db 1      ; Dirección inicial: derecha
-
-; Para la rutina de colisión
-x_off           dw 0
-y_off           dw 0
-
-; Temporizador
-time_start      dw 0      ; Ticks iniciales (BIOS)
-time_current    dw 0      ; Ticks actuales
-time_seconds    dw 60     ; Segundos restantes
-time_str        db 'Time: 60', 0
-
-; Puntos de cambio de dirección para el bot
-waypoint_range dw 20      ; Rango de tolerancia en píxeles
-
-waypoint1_x    dw 600    ; Primer punto X
-waypoint1_y    dw 40     ; Primer punto Y
-waypoint1_dir  db 2      ; Nueva dirección (2=Abajo)
-
-waypoint2_x    dw 600    ; Segundo punto X
-waypoint2_y    dw 250    ; Segundo punto Y
-waypoint2_dir  db 3      ; Nueva dirección (3=Izquierda)
-
-waypoint3_x    dw 30    ; Tercer punto X
-waypoint3_y    dw 250    ; Tercer punto Y
-waypoint3_dir  db 4      ; Nueva dirección (4=Arriba)
-
-waypoint4_x    dw 30    ; Cuarto punto X
-waypoint4_y    dw 40     ; Cuarto punto Y
-waypoint4_dir  db 1      ; Nueva dirección (1=Derecha)
-
-; Variables para velocidades de los bots
-bot_speed       dw 5      ; Velocidad inicial (será reemplazada por valor aleatorio)
-bot2_speed      dw 5      ; Velocidad inicial (será reemplazada por valor aleatorio)
-bot3_speed      dw 5      ; Velocidad inicial (será reemplazada por valor aleatorio)
-random_seed     dw 0      ; Semilla para generación de números aleatorios
-
-
-; Variable temporal para cálculos
-random_range_temp dw 0
-
-
-; Contadores de vueltas
-player1_laps     dw 0      ; Vueltas del jugador 1
-player1_lap_str  db 'P1 Laps: 00', 0  ; Cadena para mostrar
-checkpoint_x1    dw 10    ; X mínima del punto de control
-checkpoint_x2    dw 100    ; X máxima del punto de control
-checkpoint_y1    dw 10     ; Y mínima del punto de control
-checkpoint_y2    dw 130     ; Y máxima del punto de control
-in_checkpoint    db 0      ; Flag para indicar si ya está en el checkpoint
-
-checkpoint2_x1    dw 550    ; X min of the second checkpoint
-checkpoint2_x2    dw 600    ; X max of the second checkpoint
-checkpoint2_y1    dw 200    ; Y min of the second checkpoint
-checkpoint2_y2    dw 300    ; Y max of the second checkpoint
-checkpoint2_passed db 0     ; Flag to indicate if checkpoint2 has been passed
-
-player2_laps     dw 0      ; Vueltas del jugador 2
-player2_lap_str  db 'P2 Laps: 00', 0  ; Cadena para mostrar
-checkpoint2_passed_p2 db 0     ; Flag para Player 2
-in_checkpoint_p2    db 0      ; Flag para indicar si está en el checkpoint
-
+player2_x       dw 100      ; Posición X del jugador 2
+player2_y       dw 40       ; Posición Y del jugador 2
+player2_color   db 4        ; Color 4 (rojo) para jugador 2
+player2_width   dw 10       ; Ancho del jugador 2
+player2_height  dw 10       ; Alto del jugador 2
+old2_x          dw 100      ; Posición X anterior del jugador 2
+old2_y          dw 40       ; Posición Y anterior del jugador 2
 
 ; Bot 1
-bot1_laps       dw 0      ; Vueltas del bot 1
-bot1_lap_str    db 'P3 Laps: 00', 0
-checkpoint2_passed_bot1 db 0
-in_checkpoint_bot1 db 0
+bot_x          dw 100       ; Posición X inicial del bot 1
+bot_y          dw 55        ; Posición Y inicial del bot 1
+bot_color      db 1         ; Color 1 (azul) para bot 1
+bot_width      dw 10        ; Ancho del bot 1
+bot_height     dw 10        ; Alto del bot 1
+old_bot_x      dw 100       ; Posición X anterior del bot 1
+old_bot_y      dw 55        ; Posición Y anterior del bot 1
+bot_direction  db 1         ; Dirección del bot 1: 1=Derecha, 2=Abajo, 3=Izquierda, 4=Arriba
 
 ; Bot 2
-bot2_laps       dw 0      ; Vueltas del bot 2
-bot2_lap_str    db 'P4 Laps: 00', 0
-checkpoint2_passed_bot2 db 0
-in_checkpoint_bot2 db 0
+bot2_x          dw 80       ; Posición X inicial del bot 2
+bot2_y          dw 50       ; Posición Y inicial del bot 2
+bot2_color      db 14       ; Color 14 (amarillo) para bot 2
+bot2_width      dw 10       ; Ancho del bot 2
+bot2_height     dw 10       ; Alto del bot 2
+old_bot2_x      dw 100      ; Posición X anterior del bot 2
+old_bot2_y      dw 70       ; Posición Y anterior del bot 2
+bot2_direction  db 1        ; Dirección inicial: 1=derecha
 
 ; Bot 3
-bot3_laps       dw 0      ; Vueltas del bot 3
-bot3_lap_str    db 'P5 Laps: 00', 0
-checkpoint2_passed_bot3 db 0
-in_checkpoint_bot3 db 0
+bot3_x          dw 80       ; Posición X inicial del bot 3
+bot3_y          dw 30       ; Posición Y inicial del bot 3
+bot3_color      db 5        ; Color 5 (magenta/morado) para bot 3
+bot3_width      dw 10       ; Ancho del bot 3
+bot3_height     dw 10       ; Alto del bot 3
+old_bot3_x      dw 100      ; Posición X anterior del bot 3
+old_bot3_y      dw 85       ; Posición Y anterior del bot 3
+bot3_direction  db 1        ; Dirección inicial: 1=derecha
 
+; Variables para detección de colisiones
+x_off           dw 0        ; Desplazamiento X para escaneo de colisiones
+y_off           dw 0        ; Desplazamiento Y para escaneo de colisiones
 
-victory_str db 'Ganador(es):', 0
-p1_win_str     db 'Jugador 1 (P1)', 0
-p2_win_str     db 'Jugador 2 (P2)', 0
-b1_win_str     db 'Bot 1 (P3)', 0
-b2_win_str     db 'Bot 2 (P4)', 0
-b3_win_str     db 'Bot 3 (P5)', 0
+; Temporizador del juego
+time_start      dw 0        ; Ticks iniciales (BIOS)
+time_current    dw 0        ; Ticks actuales
+time_seconds    dw 60       ; Segundos restantes (partida de 60 segundos)
+time_str        db 'Time: 60', 0  ; Cadena para mostrar tiempo
 
-max_laps       dw 0
-winner_flags   db 0
+; Waypoints (puntos de cambio de dirección) para los bots
+waypoint_range dw 20        ; Rango de tolerancia en píxeles
 
-current_row db 7  ; Fila actual para imprimir ganadores
+waypoint1_x    dw 600       ; Coordenada X del primer waypoint
+waypoint1_y    dw 40        ; Coordenada Y del primer waypoint
+waypoint1_dir  db 2         ; Nueva dirección en waypoint1 (2=Abajo)
 
-; Observa que aquí ya no utilizamos "TIMES 510 - ($-$$) db 0" ni "dw 0xAA55"
-; porque esto NO es un boot sector.
+waypoint2_x    dw 600       ; Coordenada X del segundo waypoint
+waypoint2_y    dw 250       ; Coordenada Y del segundo waypoint
+waypoint2_dir  db 3         ; Nueva dirección en waypoint2 (3=Izquierda)
+
+waypoint3_x    dw 30        ; Coordenada X del tercer waypoint
+waypoint3_y    dw 250       ; Coordenada Y del tercer waypoint
+waypoint3_dir  db 4         ; Nueva dirección en waypoint3 (4=Arriba)
+
+waypoint4_x    dw 30        ; Coordenada X del cuarto waypoint
+waypoint4_y    dw 40        ; Coordenada Y del cuarto waypoint
+waypoint4_dir  db 1         ; Nueva dirección en waypoint4 (1=Derecha)
+
+; Variables para velocidades de los bots
+bot_speed       dw 5        ; Velocidad del bot 1 (será reemplazada por valor aleatorio)
+bot2_speed      dw 5        ; Velocidad del bot 2 (será reemplazada por valor aleatorio)
+bot3_speed      dw 5        ; Velocidad del bot 3 (será reemplazada por valor aleatorio)
+random_seed     dw 0        ; Semilla para generación de números aleatorios
+
+; Variable temporal para cálculos
+random_range_temp dw 0      ; Variable auxiliar para cálculos aleatorios
+
+; Sistema de conteo de vueltas para jugador 1
+player1_laps     dw 0       ; Contador de vueltas del jugador 1
+player1_lap_str  db 'P1 Laps: 00', 0  ; Cadena para mostrar vueltas
+
+; Definición de checkpoints para contar vueltas
+checkpoint_x1    dw 10      ; X mínima del checkpoint 1
+checkpoint_x2    dw 100     ; X máxima del checkpoint 1
+checkpoint_y1    dw 10      ; Y mínima del checkpoint 1
+checkpoint_y2    dw 130     ; Y máxima del checkpoint 1
+in_checkpoint    db 0       ; Flag para indicar si está en el checkpoint 1
+
+checkpoint2_x1    dw 550    ; X mínima del checkpoint 2
+checkpoint2_x2    dw 600    ; X máxima del checkpoint 2
+checkpoint2_y1    dw 200    ; Y mínima del checkpoint 2
+checkpoint2_y2    dw 300    ; Y máxima del checkpoint 2
+checkpoint2_passed db 0     ; Flag para indicar si ha pasado el checkpoint 2
+
+; Sistema de conteo de vueltas para jugador 2
+player2_laps      dw 0      ; Contador de vueltas del jugador 2
+player2_lap_str   db 'P2 Laps: 00', 0  ; Cadena para mostrar vueltas
+checkpoint2_passed_p2 db 0  ; Flag para checkpoint 2 del jugador 2
+in_checkpoint_p2     db 0   ; Flag para checkpoint 1 del jugador 2
+
+; Sistema de conteo de vueltas para Bot 1
+bot1_laps        dw 0       ; Contador de vueltas del bot 1
+bot1_lap_str     db 'P3 Laps: 00', 0  ; Cadena para mostrar vueltas
+checkpoint2_passed_bot1 db 0 ; Flag para checkpoint 2 del bot 1
+in_checkpoint_bot1 db 0     ; Flag para checkpoint 1 del bot 1
+
+; Sistema de conteo de vueltas para Bot 2
+bot2_laps        dw 0       ; Contador de vueltas del bot 2
+bot2_lap_str     db 'P4 Laps: 00', 0  ; Cadena para mostrar vueltas
+checkpoint2_passed_bot2 db 0 ; Flag para checkpoint 2 del bot 2
+in_checkpoint_bot2 db 0     ; Flag para checkpoint 1 del bot 2
+
+; Sistema de conteo de vueltas para Bot 3
+bot3_laps        dw 0       ; Contador de vueltas del bot 3
+bot3_lap_str     db 'P5 Laps: 00', 0  ; Cadena para mostrar vueltas
+checkpoint2_passed_bot3 db 0 ; Flag para checkpoint 2 del bot 3
+in_checkpoint_bot3 db 0     ; Flag para checkpoint 1 del bot 3
+
+; Cadenas para mensajes de victoria
+victory_str      db 'Ganador(es):', 0
+p1_win_str       db 'Jugador 1 (P1)', 0
+p2_win_str       db 'Jugador 2 (P2)', 0
+b1_win_str       db 'Bot 1 (P3)', 0
+b2_win_str       db 'Bot 2 (P4)', 0
+b3_win_str       db 'Bot 3 (P5)', 0
+
+; Variables para determinar ganador
+max_laps         dw 0       ; Máximo número de vueltas entre todos
+winner_flags     db 0       ; Flags de ganadores (cada bit representa un ganador)
+
+current_row      db 7       ; Fila actual para imprimir ganadores
