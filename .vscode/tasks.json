@@ -1,0 +1,15 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Compilar y Ejecutar en QEMU",
+            "type": "shell",
+            "command": "nasm -f bin stage.asm -o stage.bin && nasm -f bin boot1.asm -o boot1.bin && cat boot1.bin stage.bin > disk.img && qemu-system-i386 -fda disk.img -boot a",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        }
+    ]
+}
